@@ -1,0 +1,1020 @@
+# 文墨（Wenmo）多项目落地方案 — TAPS
+
+> **TAPS** = **T**oolchain · **A**rchitecture · **P**roduct · **S**hip  
+> 基于 `new-needs.md` 拆解的可执行落地手册。  
+> 总周期：**约 12–14 周**（6 个子项目，可 2–3 人并行压缩至 8–10 周）  
+> **数据库**：云端托管 PostgreSQL（厂商待定），详见 `new-needs.md` 4.4 节与 Step 0.2b。
+
+---
+
+## 目录
+
+1. [总览与依赖关系](#1-总览与依赖关系)
+2. [子项目 P0：工具链与协作底座](#2-子项目-p0工具链与协作底座)
+3. [子项目 P1：架构与认证底座](#3-子项目-p1架构与认证底座)
+4. [子项目 P2：AI 核心服务层](#4-子项目-p2ai-核心服务层)
+5. [子项目 P3：模块二 — 风格学习与写作](#5-子项目-p3模块二--风格学习与写作)
+6. [子项目 P4：模块三 — 智能聊天助手](#6-子项目-p4模块三--智能聊天助手)
+7. [子项目 P5：模块一 — 文案智能检索](#7-子项目-p5模块一--文案智能检索)
+8. [子项目 P6：打磨、上线与运营](#8-子项目-p6打磨上线与运营)
+9. [跨项目检查清单](#9-跨项目检查清单)
+10. [附录：目录结构、环境变量、命令速查](#10-附录目录结构环境变量命令速查)
+
+---
+
+## 1. 总览与依赖关系
+
+### 1.1 子项目划分
+
+| 代号 | 名称 | 周期 | 核心交付 |
+|------|------|------|----------|
+| **P0** | 工具链与协作底座 | 1 周 | 仓库、Docker（Redis）、**云端 dev PG**、CI、规范 |
+| **P1** | 架构与认证底座 | 1–2 周 | Django/Vue 骨架、JWT、云库 Schema、Celery |
+| **P2** | AI 核心服务层 | 1–2 周 | LLM 网关、提示词引擎、去 AI 味、风格提取 |
+| **P3** | 模块二：风格写作 | 2–3 周 | 风格档案 + 生成 + 前端工作台 |
+| **P4** | 模块三：聊天助手 | 2 周 | 多轮对话 + WebSocket + 场景模板 |
+| **P5** | 模块一：文案检索 | 3–4 周 | ONNX 推理 + 风险报告 + 标注 UI |
+| **P6** | 打磨、上线与运营 | 2 周 | 监控、压测、生产部署、文档 |
+
+### 1.2 依赖关系图
+
+```
+P0 工具链
+ └──► P1 架构底座
+       └──► P2 AI 核心层
+             ├──► P3 风格写作（MVP，最先上线验证）
+             ├──► P4 聊天助手
+             └──► P5 文案检索
+                   └──► P6 上线运营（依赖 P3/P4 至少完成，P5 可灰度）
+```
+
+### 1.3 推荐并行策略（3 人团队）
+
+| 时间段 | 后端 | 前端 | AI/算法 |
+|--------|------|------|---------|
+| W1 | P0 + P1 | P0 + P1 前端骨架 | P2 提示词 v1 |
+| W2–3 | P2 + P3 API | P3 页面 | P2 风格提取 |
+| W4–5 | P3 完善 + P4 API | P3 + P4 聊天 UI | 去 AI 味规则 + 评测集 |
+| W6–7 | P4 Channels | P4 流式体验 | P5 模型 ONNX 化 |
+| W8–10 | P5 检索链路 | P5 报告 UI | P5 模型精度迭代 |
+| W11–12 | P6 DevOps | P6 打磨 | P6 A/B 框架 |
+
+### 1.4 每个步骤的字段说明
+
+每个 **Step** 包含：
+
+- **目标**：这一步要达成什么
+- **负责人**：BE / FE / AI / DevOps / PM
+- **输入**：前置条件
+- **操作**：具体做什么（可勾选）
+- **产出**：交付物
+- **验收**：怎么算完成
+
+---
+
+## 2. 子项目 P0：工具链与协作底座
+
+**周期**：3–5 个工作日  
+**目标**：所有人能在本地一键启动开发环境，代码规范与协作流程就绪。
+
+### Step 0.1 初始化 Monorepo
+
+| 项 | 内容 |
+|----|------|
+| 负责人 | DevOps + BE |
+| 输入 | 无 |
+| 操作 | |
+| | ☐ 创建 Git 仓库 `wenmo`，添加 `.gitignore`（Python、Node、.env、models/） |
+| | ☐ 建立目录：`backend/`、`frontend/`、`docker/`、`docs/`、`scripts/` |
+| | ☐ 添加 `README.md`：项目简介、本地启动 3 行命令、目录说明 |
+| | ☐ 添加 `LICENSE`（如 MIT） |
+| 产出 | 可 clone 的空仓库结构 |
+| 验收 | `git clone` 后目录清晰，README 可读懂 |
+
+### Step 0.2 Docker 开发环境（Redis 本地）
+
+| 项 | 内容 |
+|----|------|
+| 负责人 | DevOps |
+| 输入 | Step 0.1 |
+| 操作 | |
+| | ☐ 编写 `docker/docker-compose.dev.yml`，包含： |
+| | &nbsp;&nbsp;• `redis:7`（端口 6379，Celery broker + 缓存） |
+| | &nbsp;&nbsp;• **不包含 PostgreSQL**（数据库走云端，见 Step 0.2b） |
+| | &nbsp;&nbsp;• 可选 `postgres:16`，挂 `profiles: ["offline"]`，仅离线调试 |
+| | ☐ 编写 `docker/.env.example`（`DATABASE_URL`、Redis URL，见 10.2 节） |
+| | ☐ 编写 `scripts/dev-up.sh`：`docker compose up -d redis` |
+| | ☐ 编写 `scripts/dev-down.sh` |
+| 产出 | `docker compose up` 后 Redis 可用 |
+| 验收 | `redis-cli ping` 返回 PONG |
+
+### Step 0.2b 云端 PostgreSQL 开通（dev 环境）
+
+| 项 | 内容 |
+|----|------|
+| 负责人 | DevOps + BE |
+| 输入 | Step 0.1 |
+| 操作 | |
+| | ☐ 选定或临时启用一家**托管 PostgreSQL**（厂商正式选型可延后，MVP 先开 dev 实例） |
+| | ☐ 创建 **dev** 实例：PostgreSQL ≥ 15，启用 SSL，开启自动备份 |
+| | ☐ 创建数据库与用户（如 `wenmo_dev`），授予 DDL/DML 权限 |
+| | ☐ 配置访问：开发者公网 IP 白名单（prod 阶段改 VPC / 内网） |
+| | ☐ 获取连接串，写入 `.env`：`DATABASE_URL=postgresql://...?sslmode=require` |
+| | ☐ 编写 `docs/database.md`：实例信息、连接方式、**禁止提交真实密码** |
+| | ☐ 验证连通：`psql "$DATABASE_URL" -c "SELECT 1"` 或 Django `manage.py dbshell` |
+| 产出 | 团队共享的云端 dev 数据库 + 文档 |
+| 验收 | 所有开发者用同一 `DATABASE_URL` 模板（各自 `.env` 本地保存）可连库 |
+
+**云厂商候选**（详见 `new-needs.md` 4.4.2 节）：阿里云 RDS、腾讯云 PostgreSQL、Supabase、Neon、AWS RDS 等——**应用只依赖 `DATABASE_URL`，后续换厂商无需改代码**。
+
+### Step 0.3 代码规范与 Git 工作流
+
+| 项 | 内容 |
+|----|------|
+| 负责人 | 全员 |
+| 操作 | |
+| | ☐ 后端：`pyproject.toml` + `ruff` + `black` + `pre-commit` |
+| | ☐ 前端：`eslint` + `prettier` + `@vue/tsconfig` |
+| | ☐ 约定分支：`main`（稳定）、`develop`（集成）、`feat/*`、`fix/*` |
+| | ☐ PR 模板：变更说明、测试方式、截图 |
+| | ☐ Commit 规范：`feat:` / `fix:` / `docs:` / `chore:` |
+| 产出 | pre-commit 钩子、PR 模板 |
+| 验收 | 提交前自动 lint，PR 有模板 |
+
+### Step 0.4 CI 基础流水线
+
+| 项 | 内容 |
+|----|------|
+| 负责人 | DevOps |
+| 操作 | |
+| | ☐ GitHub Actions / GitLab CI： |
+| | &nbsp;&nbsp;• `lint` job（backend ruff + frontend eslint） |
+| | &nbsp;&nbsp;• `test` job（占位，P1 后补真实测试） |
+| | ☐ CI 仅在 PR 到 `develop` / `main` 时触发 |
+| 产出 | `.github/workflows/ci.yml` |
+| 验收 | 任意 PR 自动跑 lint 并通过 |
+
+### P0 里程碑验收
+
+- [ ] 新成员按 README 30 分钟内跑起 Redis + 连通云端 dev 数据库
+- [ ] pre-commit + CI lint 生效
+- [ ] 分支策略文档写入 `docs/workflow.md`
+- [ ] `docs/database.md` 记录 dev 实例连接方式（无真实密钥）
+
+---
+
+## 3. 子项目 P1：架构与认证底座
+
+**周期**：1–2 周  
+**目标**：前后端骨架、用户体系、数据库表、异步任务、OpenAPI 文档全部跑通。
+
+### Step 1.1 后端 Django 脚手架
+
+| 项 | 内容 |
+|----|------|
+| 负责人 | BE |
+| 输入 | P0 完成 |
+| 操作 | |
+| | ☐ `django-admin startproject config backend/` |
+| | ☐ 安装依赖：`django`, `djangorestframework`, `djangorestframework-simplejwt`, `django-cors-headers`, `psycopg2-binary`, `dj-database-url`, `celery`, `redis`, `python-dotenv`, `drf-spectacular` |
+| | ☐ 配置 `config/settings/` 拆分：`base.py`, `dev.py`, `prod.py` |
+| | ☐ 配置数据库：**仅通过 `DATABASE_URL` 连接云端 PostgreSQL**（`sslmode=require`） |
+| | ☐ 配置 CORS 白名单（`localhost:5173`） |
+| | ☐ 配置 `drf-spectacular` → `/api/schema/` + `/api/docs/` |
+| | ☐ 健康检查接口 `GET /api/v1/health/` |
+| 产出 | Django 项目可 `runserver` |
+| 验收 | `/api/v1/health/` 返回 200；Swagger UI 可访问 |
+
+### Step 1.2 用户模块（apps/users）
+
+| 项 | 内容 |
+|----|------|
+| 负责人 | BE |
+| 操作 | |
+| | ☐ 自定义 User 模型（email 登录，UUID 主键） |
+| | ☐ 实现 API： |
+| | &nbsp;&nbsp;• `POST /api/v1/auth/register` |
+| | &nbsp;&nbsp;• `POST /api/v1/auth/login` → access + refresh JWT |
+| | &nbsp;&nbsp;• `POST /api/v1/auth/refresh` |
+| | &nbsp;&nbsp;• `GET /api/v1/auth/me` |
+| | ☐ Serializer 校验：邮箱格式、密码强度（≥8 位） |
+| | ☐ 密码 bcrypt / Django 默认 hash |
+| | ☐ Django Admin 注册 User |
+| 产出 | 完整认证 API |
+| 验收 | Postman / Swagger 跑通注册→登录→me |
+
+### Step 1.3 核心数据表迁移
+
+| 项 | 内容 |
+|----|------|
+| 负责人 | BE |
+| 操作 | |
+| | ☐ 创建 app 占位（空 Model 即可）：`documents`, `styles`, `chat`, `prompts`, `tasks` |
+| | ☐ 建表（按 new-needs 4.4 节）： |
+| | &nbsp;&nbsp;• `style_profiles` |
+| | &nbsp;&nbsp;• `generation_records` |
+| | &nbsp;&nbsp;• `document_reviews` |
+| | &nbsp;&nbsp;• `chat_sessions` |
+| | &nbsp;&nbsp;• `prompt_templates` |
+| | &nbsp;&nbsp;• `async_tasks` |
+| | ☐ 所有业务表 `user_id` 外键 + 索引 |
+| | ☐ JSONB 字段：`preferences`, `style_vector`, `features`, `risks`, `persona`, `messages` |
+| | ☐ 运行 `makemigrations` + `migrate`（目标库为**云端 dev 实例**） |
+| 产出 | 云端数据库 Schema v1 |
+| 验收 | 云控制台或 `dbshell` 可见全部表；Admin 可浏览 |
+
+### Step 1.4 Celery 异步任务底座
+
+| 项 | 内容 |
+|----|------|
+| 负责人 | BE |
+| 操作 | |
+| | ☐ `config/celery.py` 配置 broker = Redis |
+| | ☐ 创建 `apps/tasks/models.py` → `AsyncTask` 模型 |
+| | ☐ 创建通用任务状态机：`pending → running → success / failed` |
+| | ☐ 实现 `GET /api/v1/tasks/{task_id}/` 查询接口 |
+| | ☐ 编写测试任务 `ping_task`：延迟 3 秒返回 "pong" |
+| | ☐ `docker-compose.dev.yml` 增加 `celery worker` 服务 |
+| 产出 | 异步任务可提交、可轮询 |
+| 验收 | 提交 ping_task → 轮询拿到 success |
+
+### Step 1.5 前端 Vue 脚手架
+
+| 项 | 内容 |
+|----|------|
+| 负责人 | FE |
+| 操作 | |
+| | ☐ `npm create vite@latest frontend -- --template vue-ts` |
+| | ☐ 安装：`vue-router`, `pinia`, `axios`, `element-plus`（或 Naive UI） |
+| | ☐ 配置 `vite.config.ts`：`@` 别名、`/api` 代理到 `localhost:8000` |
+| | ☐ 目录按 new-needs 4.3 节创建 |
+| | ☐ 全局布局：顶栏 + 侧边导航（首页 / 风格写作 / 聊天 / 文案检索 / 设置） |
+| | ☐ 路由占位页（空页面 + 标题即可） |
+| 产出 | 前端可 `npm run dev` |
+| 验收 | 浏览器访问各路由，布局正常 |
+
+### Step 1.6 前端认证链路
+
+| 项 | 内容 |
+|----|------|
+| 负责人 | FE |
+| 操作 | |
+| | ☐ `src/api/http.ts`：Axios 实例 + JWT 拦截器（自动带 Authorization） |
+| | ☐ `src/api/auth.ts`：register / login / refresh / me |
+| | ☐ `src/stores/user.ts`：Pinia 存 token + userInfo |
+| | ☐ `src/composables/useAuth.ts` |
+| | ☐ 页面：`/login`, `/register` |
+| | ☐ 路由守卫：未登录跳转 login |
+| | ☐ Token 过期自动 refresh，失败则 logout |
+| 产出 | 完整登录注册流程 |
+| 验收 | 注册→登录→刷新页面仍保持登录态 |
+
+### P1 里程碑验收
+
+- [ ] 前后端联调：登录后进首页，Swagger 文档完整
+- [ ] Celery worker 正常消费任务
+- [ ] 云端 dev 数据库 7 张核心表就绪
+- [ ] CI 增加 backend `manage.py check` + frontend `npm run build`
+
+---
+
+## 4. 子项目 P2：AI 核心服务层
+
+**周期**：1–2 周  
+**目标**：LLM 网关、提示词引擎、风格提取、去 AI 味后处理——三大产品模块的共同底座。
+
+> **说明**：P2 不面向用户直接暴露，但 P3/P4/P5 全部依赖它。建议 AI 工程与后端 Pair 开发。
+
+### Step 2.1 LLM 网关（core/llm/）
+
+| 项 | 内容 |
+|----|------|
+| 负责人 | BE + AI |
+| 操作 | |
+| | ☐ 定义抽象基类 `BaseLLMProvider`：`complete()`, `stream()` |
+| | ☐ 实现 `OpenAIProvider`（GPT-4o，环境变量 `OPENAI_API_KEY`） |
+| | ☐ 实现 `ClaudeProvider`（可选，二期） |
+| | ☐ 实现 `LLMGateway`：统一入口 + 厂商注册表 |
+| | ☐ Fallback 策略：主厂商失败自动切备用 |
+| | ☐ 调用日志：记录 model、tokens、latency、cost 到 DB 或日志 |
+| | ☐ 限流：单用户每分钟 N 次（Redis 计数） |
+| 产出 | `from core.llm import gateway; gateway.complete(...)` 可用 |
+| 验收 | 单元测试：mock API 返回；集成测试：真实调用返回文本 |
+
+### Step 2.2 提示词模板引擎（core/prompts/ + apps/prompts/）
+
+| 项 | 内容 |
+|----|------|
+| 负责人 | AI + BE |
+| 操作 | |
+| | ☐ Jinja2 环境：`backend/templates/prompts/` |
+| | ☐ 目录：`system/`, `styles/`, `chat/`, `documents/` |
+| | ☐ 实现 `PromptEngine.render(module, version, **context)` |
+| | ☐ DB 模型 `PromptTemplate` 与文件模板双轨（DB 可覆盖文件） |
+| | ☐ 种子数据：写入 v1.0.0 模板（至少 styles/generate.j2） |
+| | ☐ Admin 页面：查看 / 激活模板版本 |
+| | ☐ A/B 分流：`hash(user_id) % 100` 选版本 |
+| 产出 | 模板引擎 + 首批模板 |
+| 验收 | 给定 style_features 渲染出完整 prompt；Admin 可切换激活版本 |
+
+### Step 2.3 去 AI 味后处理（core/deai/）
+
+| 项 | 内容 |
+|----|------|
+| 负责人 | AI |
+| 操作 | |
+| | ☐ **规则层** `deai/rules.py`： |
+| | &nbsp;&nbsp;• 黑名单词库（赋能、抓手、综上所述、在当今…） |
+| | &nbsp;&nbsp;• 检测函数 `detect_ai_flavor(text) -> score, hits[]` |
+| | &nbsp;&nbsp;• 可选替换/警告（不自动改写，只打分） |
+| | ☐ **重试策略** `deai/retry.py`： |
+| | &nbsp;&nbsp;• score > 阈值 → 提高 temperature 或换模板重生成 |
+| | &nbsp;&nbsp;• 最多重试 2 次 |
+| | ☐ 建立评测集 `docs/eval/deai_samples.json`（20 条 AI 味 + 20 条人话） |
+| 产出 | 去 AI 味检测模块 |
+| 验收 | 评测集上 AI 味样本均分 > 0.7，人话样本均分 < 0.3 |
+
+### Step 2.4 风格提取管线（core/style/）
+
+| 项 | 内容 |
+|----|------|
+| 负责人 | AI + BE |
+| 操作 | |
+| | ☐ `style/preprocess.py`：清洗 HTML、归一空白 |
+| | ☐ `style/features.py` 提取： |
+| | &nbsp;&nbsp;• 高频词 Top30（去停用词） |
+| | &nbsp;&nbsp;• 平均句长、句长标准差 |
+| | &nbsp;&nbsp;• 语气词频率（吧、啊、呢、嘛、其实、反正…） |
+| | &nbsp;&nbsp;• 标点习惯（省略号、感叹号比例） |
+| | ☐ `style/embedding.py`： |
+| | &nbsp;&nbsp;• 调用 embedding API（OpenAI text-embedding-3-small 或本地模型） |
+| | &nbsp;&nbsp;• 多样本取向量平均 → `style_vector` |
+| | ☐ `style/similarity.py`：`cosine_similarity(vec_a, vec_b)` |
+| | ☐ `style/describe.py`：features → 自然语言风格描述（供 prompt 注入） |
+| 产出 | `extract_style(samples) -> {vector, features, description}` |
+| 验收 | 同一作者 3 篇样本相似度 > 0.8；不同作者 < 0.5 |
+
+### Step 2.5 提示词 v1 撰写（AI 工程）
+
+| 项 | 内容 |
+|----|------|
+| 负责人 | AI + PM |
+| 操作 | |
+| | ☐ `styles/extract.j2`：分析样本、输出 features JSON |
+| | ☐ `styles/generate.j2`：注入风格描述 + 禁止 AI 腔 |
+| | ☐ `chat/persona.j2`：根据场景+关系生成人设卡片 |
+| | ☐ `chat/reply.j2`：多轮对话回复 |
+| | ☐ `documents/report.j2`：风险列表 → 人话报告 |
+| | ☐ 每个模板含 `[禁止事项]` 段：禁用词列表 |
+| | ☐ PM 人工 Review 首批模板（双人签字） |
+| 产出 | 4 套 v1.0.0 模板 |
+| 验收 | 人工生成 10 条样本，≥7 条通过「人话」主观评分 |
+
+### P2 里程碑验收
+
+- [ ] LLM 网关 stream/complete 稳定
+- [ ] 风格提取 + 相似度计算可用
+- [ ] 去 AI 味检测 + 重试逻辑可用
+- [ ] 4 套 Jinja2 模板入库
+
+---
+
+## 5. 子项目 P3：模块二 — 风格学习与写作
+
+**周期**：2–3 周  
+**目标**：**MVP 核心**——用户上传样本、创建风格档案、按风格生成文案。  
+**优先级**：最高，最先对用户可见。
+
+### Step 3.1 后端 — 风格档案 CRUD
+
+| 项 | 内容 |
+|----|------|
+| 负责人 | BE |
+| 输入 | P1 表结构 + P2 风格提取 |
+| 操作 | |
+| | ☐ `apps/styles/models.py` 完善 `StyleProfile` |
+| | ☐ `POST /api/v1/styles/profiles`： |
+| | &nbsp;&nbsp;• 接收 name + samples[]（文本或文件） |
+| | &nbsp;&nbsp;• 调用 `extract_style()` → 存 vector + features |
+| | &nbsp;&nbsp;• 返回 profile_id + features 预览 |
+| | ☐ `GET /api/v1/styles/profiles`：分页列表 |
+| | ☐ `GET /api/v1/styles/profiles/{id}`：详情 + 特征可视化数据 |
+| | ☐ `PUT /api/v1/styles/profiles/{id}`：更新名称 / 追加样本 |
+| | ☐ `DELETE /api/v1/styles/profiles/{id}` |
+| | ☐ 权限：仅 owner 可 CRUD |
+| | ☐ 校验：至少 3 篇样本，每篇 ≥ 100 字 |
+| 产出 | 风格档案全套 API |
+| 验收 | Swagger 全流程通过；多样本提取 < 15 秒 |
+
+### Step 3.2 后端 — 风格引导生成
+
+| 项 | 内容 |
+|----|------|
+| 负责人 | BE + AI |
+| 操作 | |
+| | ☐ `POST /api/v1/styles/generate`： |
+| | &nbsp;&nbsp;• 参数：profile_id, topic, outline?, tone_slider?(0-100 正式↔口语) |
+| | ☐ Service 流程： |
+| | &nbsp;&nbsp;1. 加载 profile → features + description |
+| | &nbsp;&nbsp;2. `PromptEngine.render('styles/generate', ...)` |
+| | &nbsp;&nbsp;3. `LLMGateway.stream(...)` |
+| | &nbsp;&nbsp;4. 生成完毕 → `deai.detect` → 不达标则重试 |
+| | &nbsp;&nbsp;5. `cosine_similarity(generated, profile.vector)` → 不达标则重试 |
+| | &nbsp;&nbsp;6. 写入 `generation_records` |
+| | ☐ 支持 `?stream=true` → SSE 流式响应 |
+| | ☐ `GET /api/v1/styles/generations`：历史列表 |
+| 产出 | 生成 API + 流式输出 |
+| 验收 | 首 token ≤ 3s；相似度 < 0.75 自动重试；历史可查 |
+
+### Step 3.3 前端 — 风格档案管理页
+
+| 项 | 内容 |
+|----|------|
+| 负责人 | FE |
+| 操作 | |
+| | ☐ 路由 `/style` → 档案列表页 |
+| | ☐ 组件 `StyleProfileCard`：名称、样本数、更新时间 |
+| | ☐ 弹窗 `CreateProfileModal`： |
+| | &nbsp;&nbsp;• 名称输入 |
+| | &nbsp;&nbsp;• 多样本上传（txt/docx/粘贴） |
+| | &nbsp;&nbsp;• 提交 → loading → 跳转详情 |
+| | ☐ 空状态引导：「上传 3–5 篇你写过的文章，AI 将学习你的笔风」 |
+| 产出 | 档案列表 + 创建流程 |
+| 验收 | 完整走通创建档案 |
+
+### Step 3.4 前端 — 风格详情与特征预览
+
+| 项 | 内容 |
+|----|------|
+| 负责人 | FE |
+| 操作 | |
+| | ☐ 路由 `/style/:id` → 档案详情 |
+| | ☐ 展示：高频词云 / 句长柱状图 / 语气词标签 |
+| | ☐ 样本列表（可展开查看原文） |
+| | ☐ 操作：编辑名称、追加样本、删除档案 |
+| | ☐ 「开始写作」按钮 → 跳转 `/style/:id/write` |
+| 产出 | 风格可视化详情页 |
+| 验收 | 特征数据从 API 正确渲染 |
+
+### Step 3.5 前端 — 写作工作台
+
+| 项 | 内容 |
+|----|------|
+| 负责人 | FE |
+| 操作 | |
+| | ☐ 路由 `/style/:id/write` |
+| | ☐ 左栏：输入区（主题、大纲、关键词） |
+| | ☐ 右栏：生成结果（流式打字效果） |
+| | ☐ 控件：正式↔口语滑块、重新生成、复制、👍/👎 反馈 |
+| | ☐ `composables/useStreamGenerate.ts`：SSE 消费 |
+| | ☐ 底部：历史生成记录折叠面板 |
+| 产出 | 完整写作工作台 |
+| 验收 | 流式生成体验流畅；反馈按钮可用 |
+
+### Step 3.6 联调与 MVP 验收
+
+| 项 | 内容 |
+|----|------|
+| 负责人 | 全员 |
+| 操作 | |
+| | ☐ 准备 3 个测试账号 + 3 组真实风格样本 |
+| | ☐ E2E 测试路径：注册 → 上传样本 → 创建档案 → 生成 → 评价 |
+| | ☐ 修 bug、调 prompt、调相似度阈值 |
+| | ☐ 编写 `docs/user-guide-style.md` |
+| 产出 | **模块二 MVP 可演示** |
+| 验收 | new-needs 3.2 节全部验收标准通过 |
+
+### P3 里程碑验收
+
+- [ ] 3 篇样本可创建档案
+- [ ] 生成内容带用户风格特征
+- [ ] 流式首 token ≤ 3 秒
+- [ ] 去 AI 味 + 风格相似度双重校验生效
+- [ ] 可对内 Demo
+
+---
+
+## 6. 子项目 P4：模块三 — 智能聊天助手
+
+**周期**：2 周  
+**目标**：场景化聊天、多轮对话、流式回复、消息建议。
+
+### Step 4.1 后端 — 会话与人设
+
+| 项 | 内容 |
+|----|------|
+| 负责人 | BE + AI |
+| 操作 | |
+| | ☐ 完善 `ChatSession` 模型：goal, relationship, scene, persona(JSONB), messages(JSONB) |
+| | ☐ 预设场景枚举：`invite_dinner`, `persuade_game`, `comfort`, `urge`, `custom` |
+| | ☐ `POST /api/v1/chat/sessions`： |
+| | &nbsp;&nbsp;• 输入：scene, relationship, goal, optional style_profile_id |
+| | &nbsp;&nbsp;• 调用 `chat/persona.j2` 生成 persona 卡片 |
+| | &nbsp;&nbsp;• 存库并返回 session |
+| | ☐ `GET /api/v1/chat/sessions`：列表 |
+| | ☐ `GET /api/v1/chat/sessions/{id}`：详情 + 消息历史 |
+| | ☐ `DELETE /api/v1/chat/sessions/{id}` |
+| 产出 | 会话 CRUD + 人设生成 |
+| 验收 | 创建会话后 persona 字段有完整人设描述 |
+
+### Step 4.2 后端 — 消息与流式（Channels）
+
+| 项 | 内容 |
+|----|------|
+| 负责人 | BE |
+| 操作 | |
+| | ☐ 安装配置 `channels`, `channels-redis` |
+| | ☐ `POST /api/v1/chat/sessions/{id}/messages`： |
+| | &nbsp;&nbsp;• 用户输入「对方说的话」 |
+| | &nbsp;&nbsp;• 情绪分类（规则：含「累/烦/不想」→ 负面） |
+| | &nbsp;&nbsp;• 渲染 `chat/reply.j2` → LLM stream |
+| | &nbsp;&nbsp;• 追加 messages 数组 |
+| | ☐ WebSocket `/ws/chat/{session_id}/`： |
+| | &nbsp;&nbsp;• 鉴权（JWT query param） |
+| | &nbsp;&nbsp;• 推送 token 流 |
+| | ☐ `POST .../suggestions`：一次生成 3 条不同策略回复 |
+| | ☐ 「换一条」：同一 context + 提高 temperature 重生成 |
+| | ☐ 每条回复 ≤ 150 字后处理截断 |
+| 产出 | 消息 API + WebSocket 流 |
+| 验收 | 20 轮对话不报错；人设 prompt 前后一致 |
+
+### Step 4.3 前端 — 场景选择与新建
+
+| 项 | 内容 |
+|----|------|
+| 负责人 | FE |
+| 操作 | |
+| | ☐ 路由 `/chat` |
+| | ☐ 场景卡片网格（图标 + 标题 + 描述） |
+| | ☐ 表单：关系下拉、目标描述、可选绑定风格档案 |
+| | ☐ 创建后跳转 `/chat/:id` |
+| | ☐ 左侧：历史会话列表 |
+| 产出 | 聊天入口页 |
+| 验收 | 各预设场景均可创建会话 |
+
+### Step 4.4 前端 — 对话界面
+
+| 项 | 内容 |
+|----|------|
+| 负责人 | FE |
+| 操作 | |
+| | ☐ 路由 `/chat/:id` |
+| | ☐ IM 风格 UI：左侧 AI 气泡、右侧「对方」输入 |
+| | ☐ 流式打字效果（WebSocket 或 SSE） |
+| | ☐ 底部工具栏： |
+| | &nbsp;&nbsp;• 「生成 3 条建议」 |
+| | &nbsp;&nbsp;• 「太 AI 了，换一条」 |
+| | &nbsp;&nbsp;• 复制到剪贴板 |
+| | ☐ 移动端适配：全屏聊天布局 |
+| | ☐ `stores/chat.ts` + `composables/useChat.ts` |
+| 产出 | 完整聊天 UI |
+| 验收 | new-needs 3.3 节验收标准全部通过 |
+
+### Step 4.5 联调与场景调优
+
+| 项 | 内容 |
+|----|------|
+| 负责人 | AI + PM |
+| 操作 | |
+| | ☐ 每个预设场景测试 10 轮对话 |
+| | ☐ 调 prompt：口语化程度、字数、情绪响应 |
+| | ☐ 收集「AI 味」bad case → 更新禁止词 / 模板 |
+| | ☐ 编写 `docs/user-guide-chat.md` |
+| 产出 | 模块三可演示 |
+| 验收 | 人工抽检 5 个会话，人设不漂移 |
+
+### P4 里程碑验收
+
+- [ ] 6+ 预设场景可用
+- [ ] WebSocket 流式聊天流畅
+- [ ] 「换一条」+ 三建议功能正常
+- [ ] 移动端基本可用
+
+---
+
+## 7. 子项目 P5：模块一 — 文案智能检索
+
+**周期**：3–4 周  
+**目标**：上传文案 → 风险识别 → 自然语言报告。  
+**策略**：Week 1 先用 LLM baseline，Week 2+ 接入 ONNX 自研模型。
+
+### Step 5.1 模型准备（AI / 算法）
+
+| 项 | 内容 |
+|----|------|
+| 负责人 | AI |
+| 操作 | |
+| | ☐ 确认训练好的 PyTorch 模型 checkpoint |
+| | ☐ 导出 ONNX：`torch.onnx.export(...)`，固定 input/output names |
+| | ☐ 验证 ONNX 推理结果与 PyTorch 一致（偏差 < 1e-5） |
+| | ☐ 存储：`backend/models/document_review/v1.0.0/model.onnx` |
+| | ☐ 编写推理脚本 `scripts/test_onnx_inference.py` |
+| | ☐ MLflow 记录模型版本与离线指标（召回率、F1） |
+| 产出 | ONNX 模型 v1.0.0 |
+| 验收 | 脚本对测试集推理成功 |
+
+### Step 5.2 后端 — ONNX 推理层
+
+| 项 | 内容 |
+|----|------|
+| 负责人 | BE + AI |
+| 操作 | |
+| | ☐ `core/inference/document_reviewer.py`： |
+| | &nbsp;&nbsp;• 加载 ONNX Runtime Session |
+| | &nbsp;&nbsp;• 文本预处理：分段（512 token/chunk）、编码 |
+| | &nbsp;&nbsp;• 推理 → `[{type, score, start, end, level}]` |
+| | ☐ 合并多段结果、去重、按置信度排序 |
+| | ☐ 支持 `model_version` 参数（蓝绿切换） |
+| | ☐ **Baseline**：`LLMReviewProvider` 纯 LLM 分析（P5 第一周可用） |
+| 产出 | 推理类 + LLM fallback |
+| 验收 | 1 万字文本推理 < 30 秒；返回结构化 risks JSON |
+
+### Step 5.3 后端 — 异步检索任务
+
+| 项 | 内容 |
+|----|------|
+| 负责人 | BE |
+| 操作 | |
+| | ☐ Celery task `review_document_task(task_id, text, doc_type)` |
+| | ☐ `POST /api/v1/documents/review`： |
+| | &nbsp;&nbsp;• 校验文本 ≤ 20,000 字 |
+| | &nbsp;&nbsp;• doc_type: contract / report / testimony / general |
+| | &nbsp;&nbsp;• 创建 AsyncTask + DocumentReview 记录 |
+| | &nbsp;&nbsp;• 投递 Celery → 返回 task_id |
+| | ☐ Task 内部流程： |
+| | &nbsp;&nbsp;1. ONNX 推理 → risks[] |
+| | &nbsp;&nbsp;2. `documents/report.j2` + LLM → 自然语言报告 |
+| | &nbsp;&nbsp;3. deai 检测报告 → 不达标则重写 |
+| | &nbsp;&nbsp;4. 更新 DocumentReview + AsyncTask status |
+| | ☐ `GET /api/v1/documents/review/{task_id}`：状态 + 结果 |
+| | ☐ `GET /api/v1/documents/reviews`：历史 |
+| | ☐ `GET /api/v1/documents/reviews/{id}`：详情 |
+| 产出 | 完整检索 API |
+| 验收 | 10,000 字以内总耗时 ≤ 60 秒 |
+
+### Step 5.4 前端 — 上传与分析页
+
+| 项 | 内容 |
+|----|------|
+| 负责人 | FE |
+| 操作 | |
+| | ☐ 路由 `/review` |
+| | ☐ 文本粘贴区 + 文件上传（txt/docx） |
+| | ☐ 文档类型选择器 |
+| | ☐ 提交 → 进度条（轮询 task 状态） |
+| | ☐ 完成后跳转 `/review/:id` |
+| 产出 | 上传分析页 |
+| 验收 | 提交后 60 秒内看到结果 |
+
+### Step 5.5 前端 — 报告详情页
+
+| 项 | 内容 |
+|----|------|
+| 负责人 | FE |
+| 操作 | |
+| | ☐ 路由 `/review/:id` |
+| | ☐ 组件 `RiskHighlight`：原文 + 风险 span 高亮（高/中/低 三色） |
+| | ☐ 侧边栏：风险列表（类型、等级、摘要） |
+| | ☐ 主区域：自然语言报告（Markdown 渲染） |
+| | ☐ 操作：导出 Markdown、复制报告 |
+| | ☐ （二期）导出 PDF |
+| 产出 | 报告详情页 |
+| 验收 | 风险点与原文位置对应；报告可读、无 AI 腔 |
+
+### Step 5.6 模型迭代与灰度
+
+| 项 | 内容 |
+|----|------|
+| 负责人 | AI + DevOps |
+| 操作 | |
+| | ☐ 配置 `MODEL_VERSION=v1.0.0` 环境变量 |
+| | ☐ 蓝绿部署：v1 + v2 并存，10% 流量切 v2 |
+| | ☐ 对比召回率与用户反馈 |
+| | ☐ 全量切换或回滚 |
+| 产出 | 灰度发布机制 |
+| 验收 | 可无损切换模型版本 |
+
+### P5 里程碑验收
+
+- [ ] 20,000 字以内可分析
+- [ ] 合同风险召回率 ≥ 85%（标注集）
+- [ ] 报告 ≤ 60 秒且通过去 AI 味检测
+- [ ] 历史记录可回看
+
+---
+
+## 8. 子项目 P6：打磨、上线与运营
+
+**周期**：2 周  
+**目标**：生产可用、可监控、可迭代。
+
+### Step 6.1 提示词 A/B 测试框架
+
+| 项 | 内容 |
+|----|------|
+| 负责人 | AI + BE |
+| 操作 | |
+| | ☐ `PromptTemplate` 增加 `ab_group`, `traffic_percent` |
+| | ☐ 生成时记录 `template_version` 到 generation_records |
+| | ☐ 统计：各版本 👍/👎 率、deai 分数 |
+| | ☐ Admin 仪表盘：版本对比 |
+| 产出 | A/B 分流 + 效果统计 |
+| 验收 | 可配置 50/50 分流并看到统计 |
+
+### Step 6.2 监控与日志
+
+| 项 | 内容 |
+|----|------|
+| 负责人 | DevOps |
+| 操作 | |
+| | ☐ 结构化 JSON 日志（request_id, user_id, latency） |
+| | ☐ Prometheus metrics： |
+| | &nbsp;&nbsp;• API QPS / P95 latency |
+| | &nbsp;&nbsp;• LLM 调用次数 / token 用量 |
+| | &nbsp;&nbsp;• Celery 队列长度 |
+| | ☐ Grafana 仪表盘模板 |
+| | ☐ 告警：错误率 > 1%、P95 > 5s、队列积压 > 100 |
+| 产出 | 监控体系 |
+| 验收 | Grafana 可看到实时指标 |
+
+### Step 6.3 生产 Docker Compose
+
+| 项 | 内容 |
+|----|------|
+| 负责人 | DevOps |
+| 操作 | |
+| | ☐ 开通 **prod** 云端 PostgreSQL 实例（可与 dev 不同厂商；规格按预估 QPS 选型） |
+| | ☐ 配置 prod `DATABASE_URL`（Secret / 环境变量，强制 SSL + IP/VPC 白名单） |
+| | ☐ `docker/docker-compose.prod.yml`：**不含 postgres 服务**，仅包含： |
+| | &nbsp;&nbsp;• nginx（80/443） |
+| | &nbsp;&nbsp;• backend（gunicorn + uvicorn workers） |
+| | &nbsp;&nbsp;• celery worker × 2 |
+| | &nbsp;&nbsp;• redis（或改用云 Redis，二期可选） |
+| | ☐ Nginx 配置：静态文件、`/api/` 反代、`/ws/` WebSocket |
+| | ☐ HTTPS（Let's Encrypt 或云证书） |
+| | ☐ 备份：启用云厂商**自动备份** + 重大发布前手动快照（不用容器内 `pg_dump`） |
+| 产出 | 一键生产部署（应用连云端库） |
+| 验收 | 域名 HTTPS 正常；WebSocket 不断连；应用连 prod 云库读写正常 |
+
+### Step 6.4 安全审计
+
+| 项 | 内容 |
+|----|------|
+| 负责人 | BE + DevOps |
+| 操作 | |
+| | ☐ JWT 过期时间：access 15min, refresh 7d |
+| | ☐ 所有 API 对象级权限测试（用户 A 不能访问 B 的数据） |
+| | ☐ 输入长度限制、SQL 注入/XSS 基础测试 |
+| | ☐ `.env` 不入 Git；`DATABASE_URL` 等 Secret 走环境变量 / 云平台 Secret |
+| | ☐ 数据库：prod 禁用公网裸连；SSL 必开；最小权限 DB 用户 |
+| | ☐ CORS 仅允许生产域名 |
+| | ☐ 用户「一键删除所有数据」接口 |
+| | ☐ 免责声明页面（生成内容仅供参考） |
+| 产出 | 安全检查清单全部打勾 |
+| 验收 | 渗透基础项无高危 |
+
+### Step 6.5 性能压测
+
+| 项 | 内容 |
+|----|------|
+| 负责人 | DevOps + BE |
+| 操作 | |
+| | ☐ 工具：locust / k6 |
+| | ☐ 场景：100 并发用户，混合注册/登录/生成/聊天 |
+| | ☐ 目标：非 AI 接口 P95 < 200ms；无 500 错误 |
+| | ☐ 瓶颈分析 → Redis 缓存热点 / DB 索引优化 |
+| 产出 | 压测报告 |
+| 验收 | 100 并发下服务稳定 |
+
+### Step 6.6 文档与上线
+
+| 项 | 内容 |
+|----|------|
+| 负责人 | 全员 |
+| 操作 | |
+| | ☐ `docs/deploy.md`：生产部署步骤 |
+| | ☐ `docs/api.md`：指向 Swagger |
+| | ☐ `docs/user-guide-*.md`：三模块用户指南 |
+| | ☐ 上线 checklist（**prod 云库**就绪、迁移、`DATABASE_URL`、DNS、SSL） |
+| | ☐ 灰度发布：先内部 50 用户 → 全量 |
+| | ☐ 上线后监控 72 小时 |
+| 产出 | **文墨 v1.0 正式上线** |
+| 验收 | new-needs 第九节成功指标开始追踪 |
+
+### P6 里程碑验收
+
+- [ ] 生产环境稳定运行
+- [ ] 监控告警生效
+- [ ] 安全审计通过
+- [ ] 用户文档齐全
+
+---
+
+## 9. 跨项目检查清单
+
+### 9.1 每个子项目结束前必做
+
+- [ ] API 已更新 OpenAPI Schema
+- [ ] 关键路径有测试（至少 Service 层单测）
+- [ ] 前端对应页面联调通过
+- [ ] PR Review 至少 1 人 Approve
+- [ ] 无 hardcode 密钥
+- [ ] 迁移文件已提交
+
+### 9.2 全项目上线前必做
+
+- [ ] 三模块主流程 E2E 通过
+- [ ] 去 AI 味评测集通过率 ≥ 85%
+- [ ] 100 并发压测通过
+- [ ] 云端 prod 数据库备份与回滚方案就绪（云控制台快照 / PITR）
+- [ ] 隐私政策 + 免责声明上线
+- [ ] on-call 值班表（上线后 1 周）
+
+### 9.3 技术债务记录（可后续迭代）
+
+| 项 | 优先级 | 说明 |
+|----|--------|------|
+| 云数据库厂商正式选型 | P1 | dev 实例可先开；prod 前对比 new-needs 4.4.2 并写入 docs/database.md |
+| PDF 上传解析 | P2 | 模块一二期 |
+| 国产大模型接入 | P1 | 成本与合规 |
+| OAuth 第三方登录 | P2 | 降低注册门槛 |
+| 模型层 deai 分类器 | P2 | 替代纯规则 |
+| K8s 迁移 | P3 | 用户过千后 |
+| 国际化 i18n | P3 | 出海时 |
+
+---
+
+## 10. 附录：目录结构、环境变量、命令速查
+
+### 10.1 最终 Monorepo 结构
+
+```
+wenmo/
+├── backend/
+│   ├── config/                 # Django 配置、celery、asgi
+│   ├── apps/
+│   │   ├── users/
+│   │   ├── documents/          # P5
+│   │   ├── styles/             # P3
+│   │   ├── chat/               # P4
+│   │   ├── prompts/            # P2
+│   │   └── tasks/              # P1
+│   ├── core/
+│   │   ├── llm/                # P2
+│   │   ├── inference/          # P5
+│   │   ├── style/              # P2
+│   │   └── deai/               # P2
+│   ├── templates/prompts/      # P2
+│   ├── models/document_review/ # P5 ONNX 文件
+│   ├── manage.py
+│   └── pyproject.toml
+├── frontend/
+│   ├── src/
+│   │   ├── api/
+│   │   ├── components/
+│   │   ├── composables/
+│   │   ├── stores/
+│   │   ├── views/
+│   │   └── router/
+│   └── package.json
+├── docker/
+│   ├── docker-compose.dev.yml
+│   ├── docker-compose.prod.yml
+│   └── nginx/
+├── docs/
+│   ├── database.md             # 云库连接、环境、备份（不含密钥）
+│   ├── eval/
+│   ├── user-guide-*.md
+│   └── deploy.md
+├── scripts/
+│   ├── dev-up.sh
+│   └── test_onnx_inference.py
+├── .github/workflows/ci.yml
+├── new-needs.md
+└── taps                          # 本文件
+```
+
+### 10.2 环境变量清单（`.env.example`）
+
+```bash
+# ── 云端 PostgreSQL（厂商待定，见 docs/database.md）──
+# dev / staging / prod 各一套连接串，禁止提交真实密码到 Git
+DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/wenmo_dev?sslmode=require
+
+# 离线备用（仅 docker compose --profile offline 时使用）
+# DATABASE_URL=postgresql://wenmo:changeme@localhost:5432/wenmo
+
+# ── Redis（本地 Docker）──
+REDIS_URL=redis://localhost:6379/0
+
+# ── Django ──
+DJANGO_SECRET_KEY=your-secret-key
+DJANGO_DEBUG=true
+DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
+
+# ── JWT ──
+JWT_ACCESS_LIFETIME_MIN=15
+JWT_REFRESH_LIFETIME_DAYS=7
+
+# ── LLM ──
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-4o
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+# ANTHROPIC_API_KEY=（可选）
+
+# ── 业务参数 ──
+STYLE_SIMILARITY_THRESHOLD=0.75
+DEAI_SCORE_THRESHOLD=0.6
+MAX_GENERATION_RETRIES=2
+CHAT_MAX_REPLY_LENGTH=150
+
+# ── 模型 ──
+DOCUMENT_MODEL_VERSION=v1.0.0
+DOCUMENT_MODEL_PATH=backend/models/document_review/v1.0.0/model.onnx
+
+# ── 前端 ──
+VITE_API_BASE_URL=http://localhost:8000/api/v1
+```
+
+### 10.3 本地开发命令速查
+
+```bash
+# 1. 启动本地 Redis
+./scripts/dev-up.sh
+
+# 2. 配置云端数据库（首次）
+cp docker/.env.example backend/.env
+# 编辑 backend/.env：填入 DATABASE_URL（dev 云实例）与 OPENAI_API_KEY
+
+# 3. 后端
+cd backend
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+python manage.py migrate          # 对云端 dev 库执行
+python manage.py runserver
+
+# 4. Celery（新终端）
+cd backend && source .venv/bin/activate
+celery -A config worker -l info
+
+# 5. 前端（新终端）
+cd frontend
+npm install
+npm run dev
+# → http://localhost:5173
+
+# 6. 验证云库连接
+cd backend && python manage.py dbshell   # 或 psql "$DATABASE_URL" -c "SELECT 1"
+
+# 7. 运行测试
+cd backend && pytest
+cd frontend && npm run lint && npm run build
+
+# 离线备用：无云库时启动本地 PG
+# docker compose -f docker/docker-compose.dev.yml --profile offline up -d postgres
+# 并将 DATABASE_URL 改为 localhost
+```
+
+### 10.4 生产部署命令速查
+
+```bash
+# 构建 & 启动（应用容器，数据库在云端）
+docker compose -f docker/docker-compose.prod.yml up -d --build
+
+# 数据库迁移（连 prod DATABASE_URL）
+docker compose -f docker/docker-compose.prod.yml exec backend python manage.py migrate
+
+# 收集静态文件
+docker compose -f docker/docker-compose.prod.yml exec backend python manage.py collectstatic --noinput
+
+# 查看日志
+docker compose -f docker/docker-compose.prod.yml logs -f backend celery
+
+# 备份：使用云厂商控制台「手动快照」或自动备份策略（非容器内 pg_dump）
+# 恢复：在云控制台从快照 / PITR 恢复至新实例，更新 DATABASE_URL 后重启应用
+```
+
+### 10.5 子项目 → new-needs 章节映射
+
+| TAPS 子项目 | new-needs 对应章节 |
+|-------------|-------------------|
+| P0 | 4.7 开发环境、十 团队分工 |
+| P1 | 4.2–4.4、5.1 认证、Phase 0 |
+| P2 | 4.5 AI 服务层、2 三大支柱 |
+| P3 | 3.2 模块二、5.3 API、Phase 1 |
+| P4 | 3.3 模块三、5.4 API、Phase 2 |
+| P5 | 3.1 模块一、4.6 ONNX、5.2 API、Phase 3 |
+| P6 | 4.7–4.9、六 Phase 4、七–九 |
+
+---
+
+## 变更日志
+
+| 版本 | 日期 | 说明 |
+|------|------|------|
+| v1.1 | 2026-07-08 | 数据库改为云端托管 PostgreSQL（厂商待定）；新增 Step 0.2b |
+| v1.0 | 2026-07-08 | 首版：基于 new-needs.md v1.0 拆解 7 个子项目、42 个 Step |
+
+---
+
+**使用方式**：按 P0 → P1 → P2 → P3 → P4 → P5 → P6 顺序推进；每完成一个 Step 勾选 ☐ → ☑。P3 完成后即可对内 Demo MVP，不必等 P5。

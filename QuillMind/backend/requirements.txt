@@ -1,0 +1,11 @@
+django
+djangorestframework
+djangorestframework-simplejwt
+django-cors-headers
+psycopg2-binary
+dj-database-url
+celery
+redis
+python-dotenv
+drf-spectacular
+
