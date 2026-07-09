@@ -209,17 +209,17 @@ P0 工具链
 |----|------|
 | 负责人 | BE |
 | 操作 | |
-| | ☐ 创建 app 占位（空 Model 即可）：`documents`, `styles`, `chat`, `prompts`, `tasks` |
-| | ☐ 建表（按 new-needs 4.4 节）： |
+| | ☑ 创建 app 占位（空 Model 即可）：`documents`, `styles`, `chat`, `prompts`, `tasks` |
+| | ☑ 建表（按 new-needs 4.4 节）： |
 | | &nbsp;&nbsp;• `style_profiles` |
 | | &nbsp;&nbsp;• `generation_records` |
 | | &nbsp;&nbsp;• `document_reviews` |
 | | &nbsp;&nbsp;• `chat_sessions` |
 | | &nbsp;&nbsp;• `prompt_templates` |
 | | &nbsp;&nbsp;• `async_tasks` |
-| | ☐ 所有业务表 `user_id` 外键 + 索引 |
-| | ☐ JSONB 字段：`preferences`, `style_vector`, `features`, `risks`, `persona`, `messages` |
-| | ☐ 运行 `makemigrations` + `migrate`（目标库为**云端 dev 实例**） |
+| | ☑ 所有业务表 `user_id` 外键 + 索引 |
+| | ☑ JSONB 字段：`preferences`, `style_vector`, `features`, `risks`, `persona`, `messages` |
+| | ◐ 运行 `makemigrations` + `migrate`（已生成 migrations；待配置云端 dev `DATABASE_URL` 后执行 `migrate`） |
 | 产出 | 云端数据库 Schema v1 |
 | 验收 | 云控制台或 `dbshell` 可见全部表；Admin 可浏览 |
 
@@ -229,12 +229,12 @@ P0 工具链
 |----|------|
 | 负责人 | BE |
 | 操作 | |
-| | ☐ `config/celery.py` 配置 broker = Redis |
-| | ☐ 创建 `apps/tasks/models.py` → `AsyncTask` 模型 |
-| | ☐ 创建通用任务状态机：`pending → running → success / failed` |
-| | ☐ 实现 `GET /api/v1/tasks/{task_id}/` 查询接口 |
-| | ☐ 编写测试任务 `ping_task`：延迟 3 秒返回 "pong" |
-| | ☐ `docker-compose.dev.yml` 增加 `celery worker` 服务 |
+| | ☑ `config/celery.py` 配置 broker = Redis |
+| | ☑ 创建 `apps/tasks/models.py` → `AsyncTask` 模型 |
+| | ☑ 创建通用任务状态机：`pending → running → success / failed` |
+| | ☑ 实现 `GET /api/v1/tasks/{task_id}/` 查询接口 |
+| | ☑ 编写测试任务 `ping_task`：延迟 3 秒返回 "pong" |
+| | ☑ `docker-compose.dev.yml` 增加 `celery worker` 服务 |
 | 产出 | 异步任务可提交、可轮询 |
 | 验收 | 提交 ping_task → 轮询拿到 success |
 

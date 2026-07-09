@@ -1,0 +1,28 @@
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  celery-worker:
+    image: python:3.11-slim
+    working_dir: /app
+    volumes:
+      - ./QuillMind/backend:/app
+    env_file:
+      - ./QuillMind/backend/.env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+    command: >
+      sh -c "pip install -r requirements.txt &&
+      celery -A config worker --loglevel=info"
+    depends_on:
+      redis:
+        condition: service_healthy
