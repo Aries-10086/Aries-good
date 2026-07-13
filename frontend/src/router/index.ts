@@ -1,0 +1,84 @@
+import { createRouter, createWebHistory } from "vue-router";
+
+import { useAuth } from "@/composables/useAuth";
+import { useUserStore } from "@/stores/user";
+
+const routes = [
+  {
+    path: "/login",
+    name: "login",
+    component: () => import("@/views/Auth/LoginView.vue"),
+    meta: { title: "登录", public: true, authLayout: true },
+  },
+  {
+    path: "/register",
+    name: "register",
+    component: () => import("@/views/Auth/RegisterView.vue"),
+    meta: { title: "注册", public: true, authLayout: true },
+  },
+  {
+    path: "/",
+    name: "home",
+    component: () => import("@/views/Home/HomeView.vue"),
+    meta: { title: "首页" },
+  },
+  {
+    path: "/style-writer",
+    name: "style-writer",
+    component: () => import("@/views/StyleWriter/StyleWriterView.vue"),
+    meta: { title: "风格写作" },
+  },
+  {
+    path: "/chat",
+    name: "chat",
+    component: () => import("@/views/ChatAssistant/ChatAssistantView.vue"),
+    meta: { title: "聊天" },
+  },
+  {
+    path: "/documents",
+    name: "documents",
+    component: () => import("@/views/DocumentReview/DocumentReviewView.vue"),
+    meta: { title: "文案检索" },
+  },
+  {
+    path: "/settings",
+    name: "settings",
+    component: () => import("@/views/Settings/SettingsView.vue"),
+    meta: { title: "设置" },
+  },
+];
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes,
+});
+
+router.beforeEach(async (to) => {
+  const userStore = useUserStore();
+
+  if (to.meta.public) {
+    if (userStore.isAuthenticated && (to.name === "login" || to.name === "register")) {
+      return { name: "home" };
+    }
+
+    return true;
+  }
+
+  if (!userStore.isAuthenticated) {
+    return { name: "login", query: { redirect: to.fullPath } };
+  }
+
+  if (!userStore.userInfo) {
+    try {
+      const { loadMe } = useAuth();
+      await loadMe();
+    } catch {
+      userStore.logout();
+      return { name: "login", query: { redirect: to.fullPath } };
+    }
+  }
+
+  return true;
+});
+
+export default router;

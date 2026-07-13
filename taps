@@ -244,12 +244,12 @@ P0 工具链
 |----|------|
 | 负责人 | FE |
 | 操作 | |
-| | ☐ `npm create vite@latest frontend -- --template vue-ts` |
-| | ☐ 安装：`vue-router`, `pinia`, `axios`, `element-plus`（或 Naive UI） |
-| | ☐ 配置 `vite.config.ts`：`@` 别名、`/api` 代理到 `localhost:8000` |
-| | ☐ 目录按 new-needs 4.3 节创建 |
-| | ☐ 全局布局：顶栏 + 侧边导航（首页 / 风格写作 / 聊天 / 文案检索 / 设置） |
-| | ☐ 路由占位页（空页面 + 标题即可） |
+| | ☑ `npm create vite@latest frontend -- --template vue-ts`（当前环境无 `npm`，已手工创建等价 Vite Vue TS 脚手架） |
+| | ◐ 安装：`vue-router`, `pinia`, `axios`, `element-plus`（已写入 `package.json`；当前环境无 `node/npm`，待执行 `npm install`） |
+| | ☑ 配置 `vite.config.ts`：`@` 别名、`/api` 代理到 `localhost:8000` |
+| | ☑ 目录按 new-needs 4.3 节创建 |
+| | ☑ 全局布局：顶栏 + 侧边导航（首页 / 风格写作 / 聊天 / 文案检索 / 设置） |
+| | ☑ 路由占位页（空页面 + 标题即可） |
 | 产出 | 前端可 `npm run dev` |
 | 验收 | 浏览器访问各路由，布局正常 |
 
@@ -259,13 +259,13 @@ P0 工具链
 |----|------|
 | 负责人 | FE |
 | 操作 | |
-| | ☐ `src/api/http.ts`：Axios 实例 + JWT 拦截器（自动带 Authorization） |
-| | ☐ `src/api/auth.ts`：register / login / refresh / me |
-| | ☐ `src/stores/user.ts`：Pinia 存 token + userInfo |
-| | ☐ `src/composables/useAuth.ts` |
-| | ☐ 页面：`/login`, `/register` |
-| | ☐ 路由守卫：未登录跳转 login |
-| | ☐ Token 过期自动 refresh，失败则 logout |
+| | ☑ `src/api/http.ts`：Axios 实例 + JWT 拦截器（自动带 Authorization） |
+| | ☑ `src/api/auth.ts`：register / login / refresh / me |
+| | ☑ `src/stores/user.ts`：Pinia 存 token + userInfo |
+| | ☑ `src/composables/useAuth.ts` |
+| | ☑ 页面：`/login`, `/register` |
+| | ☑ 路由守卫：未登录跳转 login |
+| | ☑ Token 过期自动 refresh，失败则 logout |
 | 产出 | 完整登录注册流程 |
 | 验收 | 注册→登录→刷新页面仍保持登录态 |
 
@@ -291,15 +291,15 @@ P0 工具链
 |----|------|
 | 负责人 | BE + AI |
 | 操作 | |
-| | ☐ 定义抽象基类 `BaseLLMProvider`：`complete()`, `stream()` |
-| | ☐ 实现 `OpenAIProvider`（GPT-4o，环境变量 `OPENAI_API_KEY`） |
-| | ☐ 实现 `ClaudeProvider`（可选，二期） |
-| | ☐ 实现 `LLMGateway`：统一入口 + 厂商注册表 |
-| | ☐ Fallback 策略：主厂商失败自动切备用 |
-| | ☐ 调用日志：记录 model、tokens、latency、cost 到 DB 或日志 |
-| | ☐ 限流：单用户每分钟 N 次（Redis 计数） |
+| | ☑ 定义抽象基类 `BaseLLMProvider`：`complete()`, `stream()` |
+| | ☑ 实现 `OpenAIProvider`（GPT-4o，环境变量 `OPENAI_API_KEY`） |
+| | ☑ 实现 `ClaudeProvider`（可选，二期，占位 provider） |
+| | ☑ 实现 `LLMGateway`：统一入口 + 厂商注册表 |
+| | ☑ Fallback 策略：主厂商失败自动切备用 |
+| | ☑ 调用日志：记录 model、tokens、latency、cost 到日志 |
+| | ☑ 限流：单用户每分钟 N 次（Redis 计数） |
 | 产出 | `from core.llm import gateway; gateway.complete(...)` 可用 |
-| 验收 | 单元测试：mock API 返回；集成测试：真实调用返回文本 |
+| 验收 | 单元测试：mock API 返回；集成测试需配置 `OPENAI_API_KEY` 后真实调用 |
 
 ### Step 2.2 提示词模板引擎（core/prompts/ + apps/prompts/）
 

@@ -8,4 +8,5 @@ celery
 redis
 python-dotenv
 drf-spectacular
+openai
 

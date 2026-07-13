@@ -121,3 +121,12 @@ CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", REDIS_URL)
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = int(os.getenv("CELERY_TASK_TIME_LIMIT", "300"))
 
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+LLM_OPENAI_MODEL = os.getenv("LLM_OPENAI_MODEL", "gpt-4o")
+LLM_PROVIDER_ORDER = os.getenv("LLM_PROVIDER_ORDER", "openai")
+LLM_RATE_LIMIT_PER_MINUTE = int(os.getenv("LLM_RATE_LIMIT_PER_MINUTE", "20"))
+LLM_MODEL_PRICING_USD_PER_1K_TOKENS = {
+    # Approximate defaults for logging only; keep billing source of truth external.
+    "gpt-4o": {"input": 0.005, "output": 0.015},
+}
+
