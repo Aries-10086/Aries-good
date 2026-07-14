@@ -9,4 +9,6 @@ redis
 python-dotenv
 drf-spectacular
 openai
+jinja2
+jieba
 

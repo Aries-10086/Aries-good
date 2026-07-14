@@ -16,6 +16,7 @@ class StyleProfile(models.Model):
     name = models.CharField(max_length=120)
     style_vector = models.JSONField(default=list, blank=True)
     features = models.JSONField(default=dict, blank=True)
+    description = models.TextField(blank=True)
     samples = ArrayField(models.TextField(), default=list, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -29,6 +30,10 @@ class StyleProfile(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def sample_count(self):
+        return len(self.samples)
 
 
 class GenerationRecord(models.Model):

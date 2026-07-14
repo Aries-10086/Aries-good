@@ -23,6 +23,7 @@ class TaskDetailView(RetrieveAPIView):
 
 class PingTaskView(APIView):
     permission_classes = [permissions.IsAuthenticated]
+    serializer_class = AsyncTaskSerializer
 
     @extend_schema(responses={202: AsyncTaskSerializer})
     def post(self, request):

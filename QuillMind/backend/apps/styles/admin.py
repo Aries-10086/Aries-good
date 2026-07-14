@@ -5,9 +5,9 @@ from .models import GenerationRecord, StyleProfile
 
 @admin.register(StyleProfile)
 class StyleProfileAdmin(admin.ModelAdmin):
-    list_display = ("name", "user", "created_at", "updated_at")
+    list_display = ("name", "user", "sample_count", "created_at", "updated_at")
     search_fields = ("name", "user__email")
-    readonly_fields = ("id", "created_at", "updated_at")
+    readonly_fields = ("id", "sample_count", "created_at", "updated_at")
 
 
 @admin.register(GenerationRecord)

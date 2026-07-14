@@ -307,13 +307,13 @@ P0 工具链
 |----|------|
 | 负责人 | AI + BE |
 | 操作 | |
-| | ☐ Jinja2 环境：`backend/templates/prompts/` |
-| | ☐ 目录：`system/`, `styles/`, `chat/`, `documents/` |
-| | ☐ 实现 `PromptEngine.render(module, version, **context)` |
-| | ☐ DB 模型 `PromptTemplate` 与文件模板双轨（DB 可覆盖文件） |
-| | ☐ 种子数据：写入 v1.0.0 模板（至少 styles/generate.j2） |
-| | ☐ Admin 页面：查看 / 激活模板版本 |
-| | ☐ A/B 分流：`hash(user_id) % 100` 选版本 |
+| | ☑ Jinja2 环境：`backend/templates/prompts/` |
+| | ☑ 目录：`system/`, `styles/`, `chat/`, `documents/` |
+| | ☑ 实现 `PromptEngine.render(module, version, **context)` |
+| | ☑ DB 模型 `PromptTemplate` 与文件模板双轨（DB 可覆盖文件） |
+| | ☑ 种子数据：写入 v1.0.0 模板（`styles/generate.j2`；待云端 dev 执行 `migrate` 后落库） |
+| | ☑ Admin 页面：查看 / 激活模板版本 |
+| | ☑ A/B 分流：稳定 `hash(user_id) % 100` 选版本 |
 | 产出 | 模板引擎 + 首批模板 |
 | 验收 | 给定 style_features 渲染出完整 prompt；Admin 可切换激活版本 |
 
@@ -323,16 +323,16 @@ P0 工具链
 |----|------|
 | 负责人 | AI |
 | 操作 | |
-| | ☐ **规则层** `deai/rules.py`： |
+| | ☑ **规则层** `deai/rules.py`： |
 | | &nbsp;&nbsp;• 黑名单词库（赋能、抓手、综上所述、在当今…） |
 | | &nbsp;&nbsp;• 检测函数 `detect_ai_flavor(text) -> score, hits[]` |
 | | &nbsp;&nbsp;• 可选替换/警告（不自动改写，只打分） |
-| | ☐ **重试策略** `deai/retry.py`： |
+| | ☑ **重试策略** `deai/retry.py`： |
 | | &nbsp;&nbsp;• score > 阈值 → 提高 temperature 或换模板重生成 |
 | | &nbsp;&nbsp;• 最多重试 2 次 |
-| | ☐ 建立评测集 `docs/eval/deai_samples.json`（20 条 AI 味 + 20 条人话） |
+| | ☑ 建立评测集 `docs/eval/deai_samples.json`（20 条 AI 味 + 20 条人话） |
 | 产出 | 去 AI 味检测模块 |
-| 验收 | 评测集上 AI 味样本均分 > 0.7，人话样本均分 < 0.3 |
+| 验收 | ☑ AI 味样本均分 0.8373 > 0.7；人话样本均分 0.0000 < 0.3 |
 
 ### Step 2.4 风格提取管线（core/style/）
 
@@ -340,19 +340,19 @@ P0 工具链
 |----|------|
 | 负责人 | AI + BE |
 | 操作 | |
-| | ☐ `style/preprocess.py`：清洗 HTML、归一空白 |
-| | ☐ `style/features.py` 提取： |
+| | ☑ `style/preprocess.py`：清洗 HTML、归一空白 |
+| | ☑ `style/features.py` 提取： |
 | | &nbsp;&nbsp;• 高频词 Top30（去停用词） |
 | | &nbsp;&nbsp;• 平均句长、句长标准差 |
 | | &nbsp;&nbsp;• 语气词频率（吧、啊、呢、嘛、其实、反正…） |
 | | &nbsp;&nbsp;• 标点习惯（省略号、感叹号比例） |
-| | ☐ `style/embedding.py`： |
+| | ☑ `style/embedding.py`： |
 | | &nbsp;&nbsp;• 调用 embedding API（OpenAI text-embedding-3-small 或本地模型） |
 | | &nbsp;&nbsp;• 多样本取向量平均 → `style_vector` |
-| | ☐ `style/similarity.py`：`cosine_similarity(vec_a, vec_b)` |
-| | ☐ `style/describe.py`：features → 自然语言风格描述（供 prompt 注入） |
+| | ☑ `style/similarity.py`：`cosine_similarity(vec_a, vec_b)` |
+| | ☑ `style/describe.py`：features → 自然语言风格描述（供 prompt 注入） |
 | 产出 | `extract_style(samples) -> {vector, features, description}` |
-| 验收 | 同一作者 3 篇样本相似度 > 0.8；不同作者 < 0.5 |
+| 验收 | ☑ mock embedding 测试：同一作者 3 篇样本相似度 > 0.8；不同作者 < 0.5（真实 API 待配置 Key 后复验） |
 
 ### Step 2.5 提示词 v1 撰写（AI 工程）
 
@@ -360,15 +360,15 @@ P0 工具链
 |----|------|
 | 负责人 | AI + PM |
 | 操作 | |
-| | ☐ `styles/extract.j2`：分析样本、输出 features JSON |
-| | ☐ `styles/generate.j2`：注入风格描述 + 禁止 AI 腔 |
-| | ☐ `chat/persona.j2`：根据场景+关系生成人设卡片 |
-| | ☐ `chat/reply.j2`：多轮对话回复 |
-| | ☐ `documents/report.j2`：风险列表 → 人话报告 |
-| | ☐ 每个模板含 `[禁止事项]` 段：禁用词列表 |
-| | ☐ PM 人工 Review 首批模板（双人签字） |
-| 产出 | 4 套 v1.0.0 模板 |
-| 验收 | 人工生成 10 条样本，≥7 条通过「人话」主观评分 |
+| | ☑ `styles/extract.j2`：分析样本、输出 features JSON |
+| | ☑ `styles/generate.j2`：注入风格描述 + 禁止 AI 腔 |
+| | ☑ `chat/persona.j2`：根据场景+关系生成人设卡片 |
+| | ☑ `chat/reply.j2`：多轮对话回复 |
+| | ☑ `documents/report.j2`：风险列表 → 人话报告 |
+| | ☑ 每个模板含 `[禁止事项]` 段：禁用词列表 |
+| | ◐ PM 人工 Review 首批模板（待 PM 双人签字） |
+| 产出 | 5 个 v1.0.0 模板（工程完成） |
+| 验收 | ◐ 模板渲染测试已通过；待人工生成 10 条样本，≥7 条通过「人话」主观评分 |
 
 ### P2 里程碑验收
 
@@ -392,19 +392,19 @@ P0 工具链
 | 负责人 | BE |
 | 输入 | P1 表结构 + P2 风格提取 |
 | 操作 | |
-| | ☐ `apps/styles/models.py` 完善 `StyleProfile` |
-| | ☐ `POST /api/v1/styles/profiles`： |
+| | ☑ `apps/styles/models.py` 完善 `StyleProfile` |
+| | ☑ `POST /api/v1/styles/profiles`： |
 | | &nbsp;&nbsp;• 接收 name + samples[]（文本或文件） |
 | | &nbsp;&nbsp;• 调用 `extract_style()` → 存 vector + features |
 | | &nbsp;&nbsp;• 返回 profile_id + features 预览 |
-| | ☐ `GET /api/v1/styles/profiles`：分页列表 |
-| | ☐ `GET /api/v1/styles/profiles/{id}`：详情 + 特征可视化数据 |
-| | ☐ `PUT /api/v1/styles/profiles/{id}`：更新名称 / 追加样本 |
-| | ☐ `DELETE /api/v1/styles/profiles/{id}` |
-| | ☐ 权限：仅 owner 可 CRUD |
-| | ☐ 校验：至少 3 篇样本，每篇 ≥ 100 字 |
+| | ☑ `GET /api/v1/styles/profiles`：分页列表 |
+| | ☑ `GET /api/v1/styles/profiles/{id}`：详情 + 特征可视化数据 |
+| | ☑ `PUT /api/v1/styles/profiles/{id}`：更新名称 / 追加样本 |
+| | ☑ `DELETE /api/v1/styles/profiles/{id}` |
+| | ☑ 权限：仅 owner 可 CRUD |
+| | ☑ 校验：至少 3 篇样本，每篇 ≥ 100 字 |
 | 产出 | 风格档案全套 API |
-| 验收 | Swagger 全流程通过；多样本提取 < 15 秒 |
+| 验收 | ◐ OpenAPI Schema 无警告/错误、mock CRUD 测试通过；真实云端 DB + OpenAI 多样本提取 < 15 秒待联调 |
 
 ### Step 3.2 后端 — 风格引导生成
 
