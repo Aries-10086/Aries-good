@@ -15,4 +15,4 @@ class GenerationRecordAdmin(admin.ModelAdmin):
     list_display = ("id", "user", "style", "model_name", "created_at")
     list_filter = ("model_name", "created_at")
     search_fields = ("user__email", "prompt", "result")
-    readonly_fields = ("id", "created_at", "updated_at")
+    readonly_fields = ("id", "quality", "created_at", "updated_at")

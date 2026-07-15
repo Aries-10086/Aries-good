@@ -1,0 +1,199 @@
+from __future__ import annotations
+
+import json
+import uuid
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
+
+from django.test import SimpleTestCase
+from django.urls import resolve, reverse
+from rest_framework.test import APIRequestFactory, force_authenticate
+
+from .generation import StyleGenerationService
+from .views import GenerationHistoryView, StyleGenerateView
+
+
+class FakePromptEngine:
+    def __init__(self):
+        self.contexts = []
+
+    def render(self, module, **context):
+        self.contexts.append({"module": module, **context})
+        return f"prompt-{len(self.contexts)}"
+
+
+class FakeGateway:
+    def __init__(self, outputs):
+        self.outputs = list(outputs)
+        self.calls = []
+
+    def stream(self, prompt, **kwargs):
+        self.calls.append({"prompt": prompt, **kwargs})
+        yield from self.outputs[len(self.calls) - 1]
+
+
+class FakeEmbeddingProvider:
+    def __init__(self, vectors):
+        self.vectors = list(vectors)
+        self.calls = []
+
+    def embed(self, texts):
+        self.calls.append(texts)
+        return [self.vectors[len(self.calls) - 1]]
+
+
+class StyleGenerationServiceTests(SimpleTestCase):
+    def setUp(self):
+        self.user = SimpleNamespace(id=uuid.uuid4())
+        self.profile = SimpleNamespace(
+            id=uuid.uuid4(),
+            user_id=self.user.id,
+            style_vector=[1.0, 0.0],
+            description="短句、自然、口语化",
+            features={"average_sentence_length": 12},
+        )
+
+    @patch("apps.styles.generation.GenerationRecord.objects.create")
+    def test_retries_low_similarity_then_saves_accepted_result(self, create_mock):
+        record = SimpleNamespace(id=uuid.uuid4(), result="第二版")
+        create_mock.return_value = record
+        gateway = FakeGateway([["第一版"], ["第二版"]])
+        prompt_engine = FakePromptEngine()
+        embedding = FakeEmbeddingProvider([[0.0, 1.0], [1.0, 0.0]])
+        service = StyleGenerationService(
+            llm_gateway=gateway,
+            prompt_engine=prompt_engine,
+            embedding_provider=embedding,
+            detector=lambda text: (0.1, []),
+        )
+
+        result = service.generate(
+            user=self.user,
+            profile=self.profile,
+            topic="写一封邀请",
+            tone_slider=80,
+        )
+
+        self.assertEqual(len(result.attempts), 2)
+        self.assertFalse(result.attempts[0].quality.accepted)
+        self.assertTrue(result.attempts[1].quality.accepted)
+        self.assertGreater(gateway.calls[1]["temperature"], gateway.calls[0]["temperature"])
+        self.assertIn("上一次未达标", prompt_engine.contexts[1]["constraints"][-1])
+        self.assertEqual(create_mock.call_args.kwargs["result"], "第二版")
+        self.assertEqual(create_mock.call_args.kwargs["quality"]["attempt_count"], 2)
+
+    @patch("apps.styles.generation.GenerationRecord.objects.create")
+    def test_stops_after_two_retries(self, create_mock):
+        create_mock.return_value = SimpleNamespace(id=uuid.uuid4(), result="第三版")
+        service = StyleGenerationService(
+            llm_gateway=FakeGateway([["第一版"], ["第二版"], ["第三版"]]),
+            prompt_engine=FakePromptEngine(),
+            embedding_provider=FakeEmbeddingProvider(
+                [[0.0, 1.0], [0.0, 1.0], [0.0, 1.0]]
+            ),
+            detector=lambda text: (0.9, []),
+        )
+
+        result = service.generate(
+            user=self.user,
+            profile=self.profile,
+            topic="测试",
+        )
+
+        self.assertEqual(len(result.attempts), 3)
+        self.assertFalse(result.attempts[-1].quality.accepted)
+        create_mock.assert_called_once()
+
+    @patch("apps.styles.generation.GenerationRecord.objects.create")
+    def test_stream_emits_retry_reset_and_complete_events(self, create_mock):
+        record_id = uuid.uuid4()
+        create_mock.return_value = SimpleNamespace(
+            id=record_id,
+            result="通过",
+            quality={"accepted": True},
+        )
+        service = StyleGenerationService(
+            llm_gateway=FakeGateway([["未", "通过"], ["通", "过"]]),
+            prompt_engine=FakePromptEngine(),
+            embedding_provider=FakeEmbeddingProvider([[0.0, 1.0], [1.0, 0.0]]),
+            detector=lambda text: (0.1, []),
+        )
+
+        events = list(
+            service.stream(
+                user=self.user,
+                profile=self.profile,
+                topic="测试",
+            )
+        )
+
+        event_names = [event["event"] for event in events]
+        self.assertIn("retry", event_names)
+        second_attempt = [
+            event
+            for event in events
+            if event["event"] == "attempt" and event["data"]["attempt"] == 2
+        ][0]
+        self.assertTrue(second_attempt["data"]["reset"])
+        self.assertEqual(events[-1]["event"], "complete")
+        self.assertEqual(events[-1]["data"]["generation_id"], str(record_id))
+
+
+class StyleGenerationApiTests(SimpleTestCase):
+    def setUp(self):
+        self.factory = APIRequestFactory()
+        self.user = SimpleNamespace(id=uuid.uuid4(), is_authenticated=True)
+        self.profile = SimpleNamespace(id=uuid.uuid4(), user_id=self.user.id)
+
+    def test_generation_routes_resolve(self):
+        self.assertIs(resolve("/api/v1/styles/generate").func.view_class, StyleGenerateView)
+        self.assertIs(
+            resolve("/api/v1/styles/generations").func.view_class,
+            GenerationHistoryView,
+        )
+
+    @patch("apps.styles.views.StyleGenerationService")
+    @patch("apps.styles.views.get_object_or_404")
+    def test_sse_response_contains_named_events(self, get_object_mock, service_class):
+        get_object_mock.return_value = self.profile
+        service_class.return_value.stream.return_value = iter(
+            [
+                {"event": "token", "data": {"attempt": 1, "text": "你好"}},
+                {
+                    "event": "complete",
+                    "data": {"generation_id": str(uuid.uuid4())},
+                },
+            ]
+        )
+        request = self.factory.post(
+            "/api/v1/styles/generate?stream=true",
+            {
+                "profile_id": str(self.profile.id),
+                "topic": "写一封邀请",
+                "tone_slider": 60,
+            },
+            format="json",
+        )
+        force_authenticate(request, user=self.user)
+
+        response = StyleGenerateView.as_view()(request)
+        body = b"".join(response.streaming_content).decode("utf-8")
+
+        self.assertEqual(response["Content-Type"], "text/event-stream")
+        self.assertIn("event: token", body)
+        self.assertIn("event: complete", body)
+        self.assertIn(json.dumps("你好", ensure_ascii=False), body)
+        get_object_mock.assert_called_once()
+        self.assertEqual(get_object_mock.call_args.kwargs["user"], self.user)
+
+    @patch("apps.styles.views.GenerationRecord.objects.filter")
+    def test_history_queryset_is_owner_scoped(self, filter_mock):
+        queryset = Mock()
+        filter_mock.return_value = queryset
+        queryset.select_related.return_value = queryset
+        queryset.order_by.return_value = queryset
+        view = GenerationHistoryView()
+        view.request = SimpleNamespace(user=self.user)
+
+        self.assertIs(view.get_queryset(), queryset)
+        filter_mock.assert_called_once_with(user=self.user)

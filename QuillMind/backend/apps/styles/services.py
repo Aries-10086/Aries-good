@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from io import BytesIO
 from pathlib import Path
 
 from django.conf import settings
@@ -10,7 +11,7 @@ from core.style import extract_style, preprocess_text
 
 MIN_SAMPLE_COUNT = 3
 MIN_SAMPLE_CHARACTERS = 100
-ALLOWED_FILE_SUFFIXES = {".txt", ".md"}
+ALLOWED_FILE_SUFFIXES = {".txt", ".md", ".docx"}
 
 
 class StyleSampleValidationError(ValueError):
@@ -48,16 +49,28 @@ def extract_profile_data(samples: list[str]):
 
 def _read_uploaded_file(uploaded_file: UploadedFile) -> str:
     suffix = Path(uploaded_file.name).suffix.lower()
-    content_type = uploaded_file.content_type or ""
-
-    if suffix not in ALLOWED_FILE_SUFFIXES and not content_type.startswith("text/"):
-        raise StyleSampleValidationError("样本文件仅支持 UTF-8 文本或 Markdown 文件。")
+    if suffix not in ALLOWED_FILE_SUFFIXES:
+        raise StyleSampleValidationError("样本文件仅支持 txt、md 或 docx 文件。")
     if uploaded_file.size > settings.STYLE_SAMPLE_MAX_FILE_BYTES:
         raise StyleSampleValidationError(
             f"单个样本文件不能超过 {settings.STYLE_SAMPLE_MAX_FILE_BYTES} 字节。"
         )
 
     raw = uploaded_file.read()
+    if suffix == ".docx":
+        try:
+            from docx import Document
+
+            document = Document(BytesIO(raw))
+        except Exception as exc:
+            raise StyleSampleValidationError("无法读取 docx 样本文件。") from exc
+
+        return "\n".join(
+            paragraph.text
+            for paragraph in document.paragraphs
+            if paragraph.text.strip()
+        )
+
     try:
         return raw.decode("utf-8-sig")
     except UnicodeDecodeError as exc:

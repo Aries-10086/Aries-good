@@ -23,10 +23,20 @@ const routes = [
     meta: { title: "首页" },
   },
   {
+    path: "/style",
+    name: "style-profiles",
+    component: () => import("@/views/StyleProfiles/StyleProfilesView.vue"),
+    meta: { title: "风格档案" },
+  },
+  {
+    path: "/style/:id",
+    name: "style-profile-detail",
+    component: () => import("@/views/StyleProfiles/StyleProfileDetailView.vue"),
+    meta: { title: "风格档案详情" },
+  },
+  {
     path: "/style-writer",
-    name: "style-writer",
-    component: () => import("@/views/StyleWriter/StyleWriterView.vue"),
-    meta: { title: "风格写作" },
+    redirect: "/style",
   },
   {
     path: "/chat",

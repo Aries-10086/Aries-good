@@ -13,7 +13,7 @@
         </div>
       </div>
 
-      <el-menu router :default-active="$route.path" class="nav-menu">
+      <el-menu router :default-active="activeMenu" class="nav-menu">
         <el-menu-item v-for="item in navItems" :key="item.path" :index="item.path">
           <span>{{ item.title }}</span>
         </el-menu-item>
@@ -50,7 +50,7 @@ const { displayName, logout } = useAuth();
 
 const navItems = [
   { path: "/", title: "首页" },
-  { path: "/style-writer", title: "风格写作" },
+  { path: "/style", title: "风格写作" },
   { path: "/chat", title: "聊天" },
   { path: "/documents", title: "文案检索" },
   { path: "/settings", title: "设置" },
@@ -58,6 +58,12 @@ const navItems = [
 
 const currentTitle = computed(() => String(route.meta.title ?? "首页"));
 const isAuthLayout = computed(() => Boolean(route.meta.authLayout));
+const activeMenu = computed(() => {
+  if (route.path.startsWith("/style")) {
+    return "/style";
+  }
+  return route.path;
+});
 </script>
 
 <style scoped>

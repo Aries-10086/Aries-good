@@ -5,7 +5,7 @@ from rest_framework.exceptions import APIException
 
 from core.style import EmbeddingError
 
-from .models import StyleProfile
+from .models import GenerationRecord, StyleProfile
 from .services import StyleSampleValidationError, extract_profile_data, prepare_samples
 
 
@@ -13,6 +13,48 @@ class StyleExtractionUnavailable(APIException):
     status_code = 503
     default_detail = "风格提取服务暂时不可用，请稍后重试。"
     default_code = "style_extraction_unavailable"
+
+
+class StyleGenerationUnavailable(APIException):
+    status_code = 503
+    default_detail = "风格生成服务暂时不可用，请稍后重试。"
+    default_code = "style_generation_unavailable"
+
+
+class StyleGenerationRequestSerializer(serializers.Serializer):
+    profile_id = serializers.UUIDField()
+    topic = serializers.CharField(max_length=2000)
+    outline = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=10000,
+        default="",
+    )
+    tone_slider = serializers.IntegerField(
+        required=False,
+        min_value=0,
+        max_value=100,
+        default=50,
+    )
+
+
+class GenerationRecordSerializer(serializers.ModelSerializer):
+    generation_id = serializers.UUIDField(source="id", read_only=True)
+    profile_id = serializers.UUIDField(source="style_id", read_only=True)
+    profile_name = serializers.CharField(source="style.name", read_only=True, default="")
+
+    class Meta:
+        model = GenerationRecord
+        fields = (
+            "generation_id",
+            "profile_id",
+            "profile_name",
+            "result",
+            "model_name",
+            "quality",
+            "created_at",
+        )
+        read_only_fields = fields
 
 
 class StyleProfileListSerializer(serializers.ModelSerializer):

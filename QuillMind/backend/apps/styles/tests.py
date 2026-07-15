@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from io import BytesIO
 import uuid
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -7,6 +8,7 @@ from unittest.mock import patch
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase
 from django.urls import resolve, reverse
+from docx import Document
 
 from .models import StyleProfile
 from .serializers import StyleProfileWriteSerializer
@@ -48,6 +50,28 @@ class StyleSampleValidationTests(SimpleTestCase):
 
         self.assertEqual(len(samples), 3)
         self.assertIn("文件", samples[2])
+
+    def test_accepts_docx_sample(self):
+        buffer = BytesIO()
+        document = Document()
+        document.add_paragraph(long_sample("Word"))
+        document.save(buffer)
+        uploaded = SimpleUploadedFile(
+            "sample.docx",
+            buffer.getvalue(),
+            content_type=(
+                "application/vnd.openxmlformats-officedocument."
+                "wordprocessingml.document"
+            ),
+        )
+
+        samples = prepare_samples(
+            [long_sample("文本一"), long_sample("文本二")],
+            [uploaded],
+        )
+
+        self.assertEqual(len(samples), 3)
+        self.assertIn("Word", samples[2])
 
 
 class StyleProfileSerializerTests(SimpleTestCase):

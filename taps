@@ -412,19 +412,19 @@ P0 工具链
 |----|------|
 | 负责人 | BE + AI |
 | 操作 | |
-| | ☐ `POST /api/v1/styles/generate`： |
+| | ☑ `POST /api/v1/styles/generate`： |
 | | &nbsp;&nbsp;• 参数：profile_id, topic, outline?, tone_slider?(0-100 正式↔口语) |
-| | ☐ Service 流程： |
+| | ☑ Service 流程： |
 | | &nbsp;&nbsp;1. 加载 profile → features + description |
 | | &nbsp;&nbsp;2. `PromptEngine.render('styles/generate', ...)` |
 | | &nbsp;&nbsp;3. `LLMGateway.stream(...)` |
 | | &nbsp;&nbsp;4. 生成完毕 → `deai.detect` → 不达标则重试 |
 | | &nbsp;&nbsp;5. `cosine_similarity(generated, profile.vector)` → 不达标则重试 |
 | | &nbsp;&nbsp;6. 写入 `generation_records` |
-| | ☐ 支持 `?stream=true` → SSE 流式响应 |
-| | ☐ `GET /api/v1/styles/generations`：历史列表 |
+| | ☑ 支持 `?stream=true` → SSE 流式响应 |
+| | ☑ `GET /api/v1/styles/generations`：历史列表 |
 | 产出 | 生成 API + 流式输出 |
-| 验收 | 首 token ≤ 3s；相似度 < 0.75 自动重试；历史可查 |
+| 验收 | ◐ mock 测试已验证相似度 < 0.75 自动重试、最多 2 次、SSE 与 owner 历史；真实首 token ≤ 3s 待 OpenAI 联调 |
 
 ### Step 3.3 前端 — 风格档案管理页
 
@@ -432,15 +432,15 @@ P0 工具链
 |----|------|
 | 负责人 | FE |
 | 操作 | |
-| | ☐ 路由 `/style` → 档案列表页 |
-| | ☐ 组件 `StyleProfileCard`：名称、样本数、更新时间 |
-| | ☐ 弹窗 `CreateProfileModal`： |
+| | ☑ 路由 `/style` → 档案列表页 |
+| | ☑ 组件 `StyleProfileCard`：名称、样本数、更新时间 |
+| | ☑ 弹窗 `CreateProfileModal`： |
 | | &nbsp;&nbsp;• 名称输入 |
 | | &nbsp;&nbsp;• 多样本上传（txt/docx/粘贴） |
 | | &nbsp;&nbsp;• 提交 → loading → 跳转详情 |
-| | ☐ 空状态引导：「上传 3–5 篇你写过的文章，AI 将学习你的笔风」 |
+| | ☑ 空状态引导：「上传 3–5 篇你写过的文章，AI 将学习你的笔风」 |
 | 产出 | 档案列表 + 创建流程 |
-| 验收 | 完整走通创建档案 |
+| 验收 | ◐ 前后端代码、docx 解析和后端测试已通过；当前环境无 Node/npm，待安装后浏览器完整走通创建档案 |
 
 ### Step 3.4 前端 — 风格详情与特征预览
 

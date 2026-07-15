@@ -26,6 +26,35 @@ export type RegisterPayload = {
   last_name?: string;
 };
 
+export type PaginatedResponse<T> = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+};
+
+export type StyleProfileSummary = {
+  profile_id: string;
+  name: string;
+  sample_count: number;
+  description: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type StyleProfileDetail = StyleProfileSummary & {
+  samples: string[];
+  style_vector: number[];
+  vector_dimension: number;
+  features: Record<string, unknown>;
+};
+
+export type CreateStyleProfilePayload = {
+  name: string;
+  samples: string[];
+  files: File[];
+};
+
 export type AsyncTask = {
   id: string;
   task_id: string;

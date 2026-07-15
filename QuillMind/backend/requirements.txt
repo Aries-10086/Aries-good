@@ -11,4 +11,5 @@ drf-spectacular
 openai
 jinja2
 jieba
+python-docx
 

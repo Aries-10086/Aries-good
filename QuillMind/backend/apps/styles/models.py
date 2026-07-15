@@ -54,6 +54,7 @@ class GenerationRecord(models.Model):
     prompt = models.TextField()
     result = models.TextField()
     model_name = models.CharField(max_length=100, blank=True)
+    quality = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
