@@ -12,7 +12,7 @@ class StyleProfileAdmin(admin.ModelAdmin):
 
 @admin.register(GenerationRecord)
 class GenerationRecordAdmin(admin.ModelAdmin):
-    list_display = ("id", "user", "style", "model_name", "created_at")
-    list_filter = ("model_name", "created_at")
+    list_display = ("id", "user", "style", "model_name", "feedback", "created_at")
+    list_filter = ("model_name", "feedback", "created_at")
     search_fields = ("user__email", "prompt", "result")
     readonly_fields = ("id", "quality", "created_at", "updated_at")

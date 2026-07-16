@@ -20,6 +20,7 @@ from core.style import EmbeddingError
 from .generation import StyleGenerationService
 from .models import GenerationRecord, StyleProfile
 from .serializers import (
+    GenerationFeedbackSerializer,
     GenerationRecordSerializer,
     StyleGenerationRequestSerializer,
     StyleGenerationUnavailable,
@@ -132,6 +133,7 @@ class StyleGenerateView(GenericAPIView):
                         profile=profile,
                         topic=data["topic"],
                         outline=data["outline"],
+                        keywords=data["keywords"],
                         tone_slider=data["tone_slider"],
                     )
                 ),
@@ -147,6 +149,7 @@ class StyleGenerateView(GenericAPIView):
                 profile=profile,
                 topic=data["topic"],
                 outline=data["outline"],
+                keywords=data["keywords"],
                 tone_slider=data["tone_slider"],
             )
         except (EmbeddingError, LLMError, PromptEngineError) as exc:
@@ -172,8 +175,29 @@ class GenerationHistoryView(ListAPIView):
     pagination_class = StyleProfilePagination
 
     def get_queryset(self):
-        return (
-            GenerationRecord.objects.filter(user=self.request.user)
-            .select_related("style")
-            .order_by("-created_at")
+        queryset = GenerationRecord.objects.filter(user=self.request.user)
+        profile_id = getattr(self.request, "query_params", {}).get("profile_id")
+        if profile_id:
+            queryset = queryset.filter(style_id=profile_id)
+        return queryset.select_related("style").order_by("-created_at")
+
+
+class GenerationFeedbackView(GenericAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = GenerationFeedbackSerializer
+
+    @extend_schema(
+        request=GenerationFeedbackSerializer,
+        responses={200: GenerationRecordSerializer},
+    )
+    def post(self, request, generation_id):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        record = get_object_or_404(
+            GenerationRecord,
+            id=generation_id,
+            user=request.user,
         )
+        record.feedback = serializer.validated_data["feedback"]
+        record.save(update_fields=("feedback", "updated_at"))
+        return Response(GenerationRecordSerializer(record).data)

@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    GenerationFeedbackView,
     GenerationHistoryView,
     StyleGenerateView,
     StyleProfileDetailView,
@@ -14,6 +15,11 @@ urlpatterns = [
         "generations",
         GenerationHistoryView.as_view(),
         name="style-generation-list",
+    ),
+    path(
+        "generations/<uuid:generation_id>/feedback",
+        GenerationFeedbackView.as_view(),
+        name="style-generation-feedback",
     ),
     path("profiles", StyleProfileListCreateView.as_view(), name="style-profile-list"),
     path(

@@ -30,6 +30,12 @@ class StyleGenerationRequestSerializer(serializers.Serializer):
         max_length=10000,
         default="",
     )
+    keywords = serializers.ListField(
+        child=serializers.CharField(max_length=100),
+        required=False,
+        max_length=20,
+        default=list,
+    )
     tone_slider = serializers.IntegerField(
         required=False,
         min_value=0,
@@ -52,9 +58,14 @@ class GenerationRecordSerializer(serializers.ModelSerializer):
             "result",
             "model_name",
             "quality",
+            "feedback",
             "created_at",
         )
         read_only_fields = fields
+
+
+class GenerationFeedbackSerializer(serializers.Serializer):
+    feedback = serializers.ChoiceField(choices=GenerationRecord.Feedback.choices)
 
 
 class StyleProfileListSerializer(serializers.ModelSerializer):

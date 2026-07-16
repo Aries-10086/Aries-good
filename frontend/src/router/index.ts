@@ -35,6 +35,12 @@ const routes = [
     meta: { title: "风格档案详情" },
   },
   {
+    path: "/style/:id/write",
+    name: "style-profile-write",
+    component: () => import("@/views/StyleWriter/StyleWriterView.vue"),
+    meta: { title: "风格写作" },
+  },
+  {
     path: "/style-writer",
     redirect: "/style",
   },

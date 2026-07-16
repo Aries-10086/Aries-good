@@ -62,15 +62,18 @@ class StyleGenerationService:
         profile: StyleProfile,
         topic: str,
         outline: str = "",
+        keywords: list[str] | None = None,
         tone_slider: int = 50,
     ) -> StyleGenerationResult:
         attempts: list[GenerationAttempt] = []
+        keywords = keywords or []
 
         for attempt_number in range(1, MAX_RETRIES + 2):
             prompt, temperature = self._build_attempt(
                 profile=profile,
                 topic=topic,
                 outline=outline,
+                keywords=keywords,
                 tone_slider=tone_slider,
                 attempt_number=attempt_number,
                 previous_attempt=attempts[-1] if attempts else None,
@@ -98,6 +101,7 @@ class StyleGenerationService:
             user=user,
             profile=profile,
             topic=topic,
+            keywords=keywords,
             attempts=attempts,
         )
         return StyleGenerationResult(record=record, attempts=attempts)
@@ -109,15 +113,18 @@ class StyleGenerationService:
         profile: StyleProfile,
         topic: str,
         outline: str = "",
+        keywords: list[str] | None = None,
         tone_slider: int = 50,
     ) -> Iterator[dict[str, Any]]:
         attempts: list[GenerationAttempt] = []
+        keywords = keywords or []
 
         for attempt_number in range(1, MAX_RETRIES + 2):
             prompt, temperature = self._build_attempt(
                 profile=profile,
                 topic=topic,
                 outline=outline,
+                keywords=keywords,
                 tone_slider=tone_slider,
                 attempt_number=attempt_number,
                 previous_attempt=attempts[-1] if attempts else None,
@@ -171,6 +178,7 @@ class StyleGenerationService:
             user=user,
             profile=profile,
             topic=topic,
+            keywords=keywords,
             attempts=attempts,
         )
         yield {
@@ -188,6 +196,7 @@ class StyleGenerationService:
         profile: StyleProfile,
         topic: str,
         outline: str,
+        keywords: list[str],
         tone_slider: int,
         attempt_number: int,
         previous_attempt: GenerationAttempt | None,
@@ -199,6 +208,8 @@ class StyleGenerationService:
         ]
         if outline:
             constraints.append(f"按这个大纲展开：{outline}")
+        if keywords:
+            constraints.append(f"自然融入这些关键词：{'、'.join(keywords)}")
         if previous_attempt is not None:
             constraints.append(self._retry_constraint(previous_attempt.quality))
 
@@ -249,7 +260,7 @@ class StyleGenerationService:
             quality=quality,
         )
 
-    def _save_record(self, *, user, profile, topic, attempts):
+    def _save_record(self, *, user, profile, topic, keywords, attempts):
         final_attempt = attempts[-1]
         return GenerationRecord.objects.create(
             user=user,
@@ -261,6 +272,7 @@ class StyleGenerationService:
                 **asdict(final_attempt.quality),
                 "attempt_count": len(attempts),
                 "topic": topic,
+                "keywords": keywords,
             },
         )
 

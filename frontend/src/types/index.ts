@@ -46,13 +46,77 @@ export type StyleProfileDetail = StyleProfileSummary & {
   samples: string[];
   style_vector: number[];
   vector_dimension: number;
-  features: Record<string, unknown>;
+  features: StyleFeatures;
 };
 
 export type CreateStyleProfilePayload = {
   name: string;
   samples: string[];
   files: File[];
+};
+
+export type UpdateStyleProfilePayload = {
+  name?: string;
+  samples?: string[];
+  files?: File[];
+};
+
+export type StyleWordFeature = {
+  word: string;
+  count: number;
+};
+
+export type ToneParticleFeature = {
+  count: number;
+  per_100_chars: number;
+};
+
+export type StyleFeatures = {
+  sample_count?: number;
+  char_count?: number;
+  top_words?: StyleWordFeature[];
+  average_sentence_length?: number;
+  sentence_length_std?: number;
+  tone_particles?: Record<string, ToneParticleFeature>;
+  punctuation_habits?: {
+    total: number;
+    ellipsis_count: number;
+    ellipsis_ratio: number;
+    exclamation_count: number;
+    exclamation_ratio: number;
+  };
+  [key: string]: unknown;
+};
+
+export type GenerationFeedback = "" | "up" | "down";
+
+export type GenerationQuality = {
+  ai_flavor_score?: number;
+  style_similarity?: number;
+  accepted?: boolean;
+  attempt_count?: number;
+  topic?: string;
+  keywords?: string[];
+  ai_flavor_hits?: Array<Record<string, unknown>>;
+};
+
+export type GenerationRecord = {
+  generation_id: string;
+  profile_id: string;
+  profile_name: string;
+  result: string;
+  model_name: string;
+  quality: GenerationQuality;
+  feedback: GenerationFeedback;
+  created_at: string;
+};
+
+export type StyleGenerationPayload = {
+  profile_id: string;
+  topic: string;
+  outline: string;
+  keywords: string[];
+  tone_slider: number;
 };
 
 export type AsyncTask = {

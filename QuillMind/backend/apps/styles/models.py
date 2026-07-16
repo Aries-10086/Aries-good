@@ -37,6 +37,10 @@ class StyleProfile(models.Model):
 
 
 class GenerationRecord(models.Model):
+    class Feedback(models.TextChoices):
+        UP = "up", "有帮助"
+        DOWN = "down", "需改进"
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -55,6 +59,11 @@ class GenerationRecord(models.Model):
     result = models.TextField()
     model_name = models.CharField(max_length=100, blank=True)
     quality = models.JSONField(default=dict, blank=True)
+    feedback = models.CharField(
+        max_length=8,
+        choices=Feedback.choices,
+        blank=True,
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

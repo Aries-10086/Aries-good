@@ -10,7 +10,8 @@ from django.urls import resolve, reverse
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from .generation import StyleGenerationService
-from .views import GenerationHistoryView, StyleGenerateView
+from .models import GenerationRecord
+from .views import GenerationFeedbackView, GenerationHistoryView, StyleGenerateView
 
 
 class FakePromptEngine:
@@ -71,6 +72,7 @@ class StyleGenerationServiceTests(SimpleTestCase):
             user=self.user,
             profile=self.profile,
             topic="写一封邀请",
+            keywords=["周末", "咖啡"],
             tone_slider=80,
         )
 
@@ -79,8 +81,13 @@ class StyleGenerationServiceTests(SimpleTestCase):
         self.assertTrue(result.attempts[1].quality.accepted)
         self.assertGreater(gateway.calls[1]["temperature"], gateway.calls[0]["temperature"])
         self.assertIn("上一次未达标", prompt_engine.contexts[1]["constraints"][-1])
+        self.assertIn("周末、咖啡", prompt_engine.contexts[0]["constraints"][-1])
         self.assertEqual(create_mock.call_args.kwargs["result"], "第二版")
         self.assertEqual(create_mock.call_args.kwargs["quality"]["attempt_count"], 2)
+        self.assertEqual(
+            create_mock.call_args.kwargs["quality"]["keywords"],
+            ["周末", "咖啡"],
+        )
 
     @patch("apps.styles.generation.GenerationRecord.objects.create")
     def test_stops_after_two_retries(self, create_mock):
@@ -151,6 +158,11 @@ class StyleGenerationApiTests(SimpleTestCase):
             resolve("/api/v1/styles/generations").func.view_class,
             GenerationHistoryView,
         )
+        feedback_url = reverse(
+            "style-generation-feedback",
+            kwargs={"generation_id": uuid.uuid4()},
+        )
+        self.assertIs(resolve(feedback_url).func.view_class, GenerationFeedbackView)
 
     @patch("apps.styles.views.StyleGenerationService")
     @patch("apps.styles.views.get_object_or_404")
@@ -197,3 +209,27 @@ class StyleGenerationApiTests(SimpleTestCase):
 
         self.assertIs(view.get_queryset(), queryset)
         filter_mock.assert_called_once_with(user=self.user)
+
+    @patch("apps.styles.views.get_object_or_404")
+    def test_feedback_is_saved_on_owned_record(self, get_object_mock):
+        record = GenerationRecord(
+            id=uuid.uuid4(),
+            result="生成结果",
+            model_name="test-model",
+            quality={},
+        )
+        get_object_mock.return_value = record
+        request = self.factory.post(
+            f"/api/v1/styles/generations/{record.id}/feedback",
+            {"feedback": "up"},
+            format="json",
+        )
+        force_authenticate(request, user=self.user)
+
+        with patch.object(record, "save") as save_mock:
+            response = GenerationFeedbackView.as_view()(request, generation_id=record.id)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(record.feedback, "up")
+        save_mock.assert_called_once_with(update_fields=("feedback", "updated_at"))
+        self.assertEqual(get_object_mock.call_args.kwargs["user"], self.user)

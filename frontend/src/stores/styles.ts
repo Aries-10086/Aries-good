@@ -5,6 +5,7 @@ import type {
   CreateStyleProfilePayload,
   StyleProfileDetail,
   StyleProfileSummary,
+  UpdateStyleProfilePayload,
 } from "@/types";
 
 type StylesState = {
@@ -56,6 +57,23 @@ export const useStylesStore = defineStore("styles", {
         return profile;
       } finally {
         this.creating = false;
+      }
+    },
+    async updateProfile(profileId: string, payload: UpdateStyleProfilePayload) {
+      const profile = await stylesApi.updateStyleProfile(profileId, payload);
+      this.currentProfile = profile;
+      const index = this.profiles.findIndex((item) => item.profile_id === profileId);
+      if (index >= 0) {
+        this.profiles[index] = profile;
+      }
+      return profile;
+    },
+    async deleteProfile(profileId: string) {
+      await stylesApi.deleteStyleProfile(profileId);
+      this.profiles = this.profiles.filter((item) => item.profile_id !== profileId);
+      this.total = Math.max(0, this.total - 1);
+      if (this.currentProfile?.profile_id === profileId) {
+        this.currentProfile = null;
       }
     },
   },
