@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+import time
 from typing import Any, Callable, Iterator
 
 from django.conf import settings
@@ -13,9 +14,14 @@ from core.style import OpenAIEmbeddingProvider, cosine_similarity
 from .models import GenerationRecord, StyleProfile
 
 
-AI_FLAVOR_THRESHOLD = 0.7
-STYLE_SIMILARITY_THRESHOLD = 0.75
-MAX_RETRIES = 2
+AI_FLAVOR_THRESHOLD = settings.STYLE_AI_FLAVOR_THRESHOLD
+STYLE_SIMILARITY_THRESHOLD = settings.STYLE_SIMILARITY_THRESHOLD
+MAX_RETRIES = settings.STYLE_GENERATION_MAX_RETRIES
+TOTAL_TIMEOUT_SECONDS = settings.STYLE_GENERATION_TIMEOUT_SECONDS
+
+
+class StyleGenerationTimeout(TimeoutError):
+    pass
 
 
 @dataclass(frozen=True)
@@ -49,11 +55,13 @@ class StyleGenerationService:
         prompt_engine=None,
         embedding_provider=None,
         detector: Callable[[str], tuple[float, list[AIFlavorHit]]] = detect_ai_flavor,
+        clock: Callable[[], float] = time.monotonic,
     ):
         self.llm_gateway = llm_gateway or default_gateway
         self.prompt_engine = prompt_engine or default_prompt_engine
         self.embedding_provider = embedding_provider or OpenAIEmbeddingProvider()
         self.detector = detector
+        self.clock = clock
 
     def generate(
         self,
@@ -67,6 +75,7 @@ class StyleGenerationService:
     ) -> StyleGenerationResult:
         attempts: list[GenerationAttempt] = []
         keywords = keywords or []
+        deadline = self.clock() + TOTAL_TIMEOUT_SECONDS
 
         for attempt_number in range(1, MAX_RETRIES + 2):
             prompt, temperature = self._build_attempt(
@@ -83,14 +92,17 @@ class StyleGenerationService:
                     prompt,
                     user_id=user.id,
                     temperature=temperature,
+                    timeout=self._remaining(deadline),
                 )
             ).strip()
+            self._remaining(deadline)
             attempt = self._evaluate_attempt(
                 number=attempt_number,
                 prompt=prompt,
                 text=text,
                 temperature=temperature,
                 profile=profile,
+                deadline=deadline,
             )
             attempts.append(attempt)
 
@@ -118,6 +130,7 @@ class StyleGenerationService:
     ) -> Iterator[dict[str, Any]]:
         attempts: list[GenerationAttempt] = []
         keywords = keywords or []
+        deadline = self.clock() + TOTAL_TIMEOUT_SECONDS
 
         for attempt_number in range(1, MAX_RETRIES + 2):
             prompt, temperature = self._build_attempt(
@@ -143,7 +156,9 @@ class StyleGenerationService:
                 prompt,
                 user_id=user.id,
                 temperature=temperature,
+                timeout=self._remaining(deadline),
             ):
+                self._remaining(deadline)
                 chunks.append(chunk)
                 yield {
                     "event": "token",
@@ -156,6 +171,7 @@ class StyleGenerationService:
                 text="".join(chunks).strip(),
                 temperature=temperature,
                 profile=profile,
+                deadline=deadline,
             )
             attempts.append(attempt)
             yield {
@@ -219,7 +235,8 @@ class StyleGenerationService:
             user_id=profile.user_id,
             task=topic,
             style_description=profile.description,
-            style_features=profile.features,
+            style_features=self._prompt_features(profile.features),
+            style_samples=self._style_examples(getattr(profile, "samples", [])),
             constraints=constraints,
             forbidden_words=[
                 "赋能",
@@ -239,9 +256,14 @@ class StyleGenerationService:
         text: str,
         temperature: float,
         profile: StyleProfile,
+        deadline: float,
     ) -> GenerationAttempt:
         ai_score, hits = self.detector(text)
-        generated_vector = self.embedding_provider.embed([text])[0]
+        generated_vector = self.embedding_provider.embed(
+            [text],
+            timeout=self._remaining(deadline),
+        )[0]
+        self._remaining(deadline)
         similarity = cosine_similarity(generated_vector, profile.style_vector)
         quality = GenerationQuality(
             ai_flavor_score=round(ai_score, 4),
@@ -298,3 +320,54 @@ class StyleGenerationService:
         if quality.style_similarity < STYLE_SIMILARITY_THRESHOLD:
             reasons.append("style_similarity")
         return reasons
+
+    def _remaining(self, deadline: float) -> float:
+        remaining = deadline - self.clock()
+        if remaining <= 0:
+            raise StyleGenerationTimeout(
+                f"生成超过 {TOTAL_TIMEOUT_SECONDS:g} 秒时间预算。"
+            )
+        return remaining
+
+    def _style_examples(self, samples: list[str]) -> list[str]:
+        examples = []
+        for sample in samples[:2]:
+            normalized = " ".join(sample.split())
+            if normalized:
+                examples.append(normalized[:600])
+        return examples
+
+    def _prompt_features(self, features: dict[str, Any]) -> dict[str, str]:
+        result: dict[str, str] = {}
+        average = features.get("average_sentence_length")
+        deviation = features.get("sentence_length_std")
+        if average is not None:
+            result["平均句长"] = f"{average} 字"
+        if deviation is not None:
+            result["句长波动"] = f"{deviation} 字"
+
+        top_words = [
+            str(item.get("word"))
+            for item in features.get("top_words", [])[:12]
+            if isinstance(item, dict) and item.get("word")
+        ]
+        if top_words:
+            result["高频词"] = "、".join(top_words)
+
+        particles = []
+        for particle, data in features.get("tone_particles", {}).items():
+            if isinstance(data, dict) and data.get("count", 0):
+                particles.append(f"{particle}（每百字 {data.get('per_100_chars', 0)} 次）")
+        if particles:
+            result["常用语气词"] = "、".join(particles)
+
+        punctuation = features.get("punctuation_habits", {})
+        if isinstance(punctuation, dict):
+            habits = []
+            if punctuation.get("exclamation_count", 0):
+                habits.append(f"感叹号占比 {punctuation.get('exclamation_ratio', 0)}")
+            if punctuation.get("ellipsis_count", 0):
+                habits.append(f"省略号占比 {punctuation.get('ellipsis_ratio', 0)}")
+            if habits:
+                result["标点习惯"] = "；".join(habits)
+        return result

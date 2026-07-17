@@ -11,7 +11,12 @@ class EmbeddingError(Exception):
 
 class BaseEmbeddingProvider(ABC):
     @abstractmethod
-    def embed(self, texts: list[str]) -> list[list[float]]:
+    def embed(
+        self,
+        texts: list[str],
+        *,
+        timeout: float | None = None,
+    ) -> list[list[float]]:
         raise NotImplementedError
 
 
@@ -39,12 +44,22 @@ class OpenAIEmbeddingProvider(BaseEmbeddingProvider):
 
         return self._client
 
-    def embed(self, texts: list[str]) -> list[list[float]]:
+    def embed(
+        self,
+        texts: list[str],
+        *,
+        timeout: float | None = None,
+    ) -> list[list[float]]:
         if not texts:
             raise ValueError("At least one text is required for embedding.")
 
         try:
-            response = self.client.embeddings.create(model=self.model, input=texts)
+            request_options = {"timeout": timeout} if timeout is not None else {}
+            response = self.client.embeddings.create(
+                model=self.model,
+                input=texts,
+                **request_options,
+            )
         except Exception as exc:
             raise EmbeddingError("OpenAI embedding request failed.") from exc
 

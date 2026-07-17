@@ -5,6 +5,13 @@ from django.db import models
 
 
 class ChatSession(models.Model):
+    class Scene(models.TextChoices):
+        INVITE_DINNER = "invite_dinner", "邀请聚餐"
+        PERSUADE_GAME = "persuade_game", "说服朋友打游戏"
+        COMFORT = "comfort", "安慰"
+        URGE = "urge", "催促"
+        CUSTOM = "custom", "自定义"
+
     class Status(models.TextChoices):
         ACTIVE = "active", "Active"
         ARCHIVED = "archived", "Archived"
@@ -17,6 +24,20 @@ class ChatSession(models.Model):
         related_name="chat_sessions",
         db_index=True,
     )
+    style_profile = models.ForeignKey(
+        "styles.StyleProfile",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="chat_sessions",
+    )
+    scene = models.CharField(
+        max_length=32,
+        choices=Scene.choices,
+        default=Scene.CUSTOM,
+        db_index=True,
+    )
+    relationship = models.CharField(max_length=120, blank=True)
     persona = models.JSONField(default=dict, blank=True)
     messages = models.JSONField(default=list, blank=True)
     status = models.CharField(

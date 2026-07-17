@@ -477,19 +477,22 @@ P0 工具链
 |----|------|
 | 负责人 | 全员 |
 | 操作 | |
-| | ☐ 准备 3 个测试账号 + 3 组真实风格样本 |
-| | ☐ E2E 测试路径：注册 → 上传样本 → 创建档案 → 生成 → 评价 |
-| | ☐ 修 bug、调 prompt、调相似度阈值 |
-| | ☐ 编写 `docs/user-guide-style.md` |
-| 产出 | **模块二 MVP 可演示** |
-| 验收 | new-needs 3.2 节全部验收标准通过 |
+| | ◐ 准备 3 个测试账号 + 3 组真实风格样本（脚本已备联调样本；真实授权样本待提供） |
+| | ◐ E2E 测试路径：注册 → 上传样本 → 创建档案 → 生成 → 评价（脚本已就绪，待 dev 环境实跑） |
+| | ☑ 修 bug、调 prompt、调相似度阈值（阈值已改为环境变量） |
+| | ☑ 编写 `docs/user-guide-style.md` |
+| 产出 | ◐ **模块二 MVP 代码与演示脚本已就绪，待 dev 环境实跑** |
+| 验收 | ◐ new-needs 3.2 代码项通过；真实模型时延与人工风格效果待验收 |
+
+> 自动化链路和三组联调数据已就绪；真实模型下的首 token / 总耗时需在配置
+> `DATABASE_URL`、`OPENAI_API_KEY` 的 dev 环境运行脚本后，以输出报告为准。
 
 ### P3 里程碑验收
 
-- [ ] 3 篇样本可创建档案
-- [ ] 生成内容带用户风格特征
+- [x] 3 篇样本可创建档案
+- [x] 生成内容带用户风格特征
 - [ ] 流式首 token ≤ 3 秒
-- [ ] 去 AI 味 + 风格相似度双重校验生效
+- [x] 去 AI 味 + 风格相似度双重校验生效
 - [ ] 可对内 Demo
 
 ---
@@ -505,15 +508,15 @@ P0 工具链
 |----|------|
 | 负责人 | BE + AI |
 | 操作 | |
-| | ☐ 完善 `ChatSession` 模型：goal, relationship, scene, persona(JSONB), messages(JSONB) |
-| | ☐ 预设场景枚举：`invite_dinner`, `persuade_game`, `comfort`, `urge`, `custom` |
-| | ☐ `POST /api/v1/chat/sessions`： |
+| | ☑ 完善 `ChatSession` 模型：goal, relationship, scene, persona(JSONB), messages(JSONB) |
+| | ☑ 预设场景枚举：`invite_dinner`, `persuade_game`, `comfort`, `urge`, `custom` |
+| | ☑ `POST /api/v1/chat/sessions`： |
 | | &nbsp;&nbsp;• 输入：scene, relationship, goal, optional style_profile_id |
 | | &nbsp;&nbsp;• 调用 `chat/persona.j2` 生成 persona 卡片 |
 | | &nbsp;&nbsp;• 存库并返回 session |
-| | ☐ `GET /api/v1/chat/sessions`：列表 |
-| | ☐ `GET /api/v1/chat/sessions/{id}`：详情 + 消息历史 |
-| | ☐ `DELETE /api/v1/chat/sessions/{id}` |
+| | ☑ `GET /api/v1/chat/sessions`：列表 |
+| | ☑ `GET /api/v1/chat/sessions/{id}`：详情 + 消息历史 |
+| | ☑ `DELETE /api/v1/chat/sessions/{id}` |
 | 产出 | 会话 CRUD + 人设生成 |
 | 验收 | 创建会话后 persona 字段有完整人设描述 |
 

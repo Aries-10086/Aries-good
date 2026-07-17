@@ -11,7 +11,12 @@ from .similarity import cosine_similarity
 
 
 class FakeEmbeddingProvider(BaseEmbeddingProvider):
-    def embed(self, texts: list[str]) -> list[list[float]]:
+    def embed(
+        self,
+        texts: list[str],
+        *,
+        timeout: float | None = None,
+    ) -> list[list[float]]:
         vectors = []
         for text in texts:
             if any(word in text for word in ("代码", "接口", "日志", "测试")):

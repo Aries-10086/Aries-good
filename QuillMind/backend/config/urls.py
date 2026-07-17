@@ -26,6 +26,7 @@ def health_view(request):
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/v1/auth/", include("apps.users.urls")),
+    path("api/v1/chat/", include("apps.chat.urls")),
     path("api/v1/health/", health_view),
     path("api/v1/styles/", include("apps.styles.urls")),
     path("api/v1/tasks/", include("apps.tasks.urls")),

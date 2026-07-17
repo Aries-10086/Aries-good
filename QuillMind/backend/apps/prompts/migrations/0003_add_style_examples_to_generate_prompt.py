@@ -1,4 +1,7 @@
-你是一名中文写作搭档。请按照给定风格完成内容，让成稿像同一个人自然写出，而不是机械模仿词语。
+from django.db import migrations
+
+
+UPDATED_CONTENT = """你是一名中文写作搭档。请按照给定风格完成内容，让成稿像同一个人自然写出，而不是机械模仿词语。
 
 ## 写作任务
 {{ task }}
@@ -47,3 +50,22 @@
 {% for word in forbidden_words | default([]) %}
 - 禁止使用“{{ word }}”。
 {% endfor %}
+"""
+
+
+def update_prompt(apps, schema_editor):
+    PromptTemplate = apps.get_model("prompts", "PromptTemplate")
+    PromptTemplate.objects.filter(
+        module="styles/generate",
+        version="v1.0.0",
+    ).update(content=UPDATED_CONTENT)
+
+
+class Migration(migrations.Migration):
+    dependencies = [
+        ("prompts", "0002_seed_prompt_templates_v1"),
+    ]
+
+    operations = [
+        migrations.RunPython(update_prompt, migrations.RunPython.noop),
+    ]

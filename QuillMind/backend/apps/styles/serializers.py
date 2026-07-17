@@ -21,6 +21,12 @@ class StyleGenerationUnavailable(APIException):
     default_code = "style_generation_unavailable"
 
 
+class StyleProfileNotReady(APIException):
+    status_code = 409
+    default_detail = "该风格档案缺少有效向量，请追加样本并重新分析。"
+    default_code = "style_profile_not_ready"
+
+
 class StyleGenerationRequestSerializer(serializers.Serializer):
     profile_id = serializers.UUIDField()
     topic = serializers.CharField(max_length=2000)

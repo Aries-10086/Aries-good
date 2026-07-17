@@ -143,6 +143,15 @@
           </div>
 
           <div v-if="error" class="error-message">{{ error }}</div>
+          <el-alert
+            v-if="result && !generating && quality.accepted === false"
+            class="quality-warning"
+            type="warning"
+            :closable="false"
+            show-icon
+            title="本次结果未达到风格质量阈值"
+            description="系统已完成自动优化，但最终版本仍未达标。建议调整要求后重新生成，使用前请人工确认。"
+          />
 
           <div v-if="result && !generating" class="result-footer">
             <div class="quality-tags">
@@ -637,6 +646,10 @@ function formatDate(value: string) {
   background: #fef2f2;
   color: #dc2626;
   font-size: 13px;
+}
+
+.quality-warning {
+  margin-top: 12px;
 }
 
 .result-footer {

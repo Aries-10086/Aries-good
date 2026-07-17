@@ -16,10 +16,17 @@ export function useStreamGenerate() {
   const statusText = ref("");
   const error = ref("");
   let controller: AbortController | null = null;
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  let timedOut = false;
 
   async function generate(payload: StyleGenerationPayload) {
     cancel();
     controller = new AbortController();
+    timedOut = false;
+    timeoutId = setTimeout(() => {
+      timedOut = true;
+      controller?.abort();
+    }, 30_000);
     result.value = "";
     generationId.value = "";
     quality.value = {};
@@ -54,6 +61,12 @@ export function useStreamGenerate() {
       }
     } catch (reason) {
       if (reason instanceof DOMException && reason.name === "AbortError") {
+        if (timedOut) {
+          const message = "生成超过 30 秒，请精简要求后重试";
+          error.value = message;
+          statusText.value = message;
+          throw new Error(message);
+        }
         statusText.value = "已停止生成";
         return;
       }
@@ -62,6 +75,8 @@ export function useStreamGenerate() {
       statusText.value = message;
       throw reason;
     } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = null;
       generating.value = false;
       controller = null;
     }
@@ -125,6 +140,9 @@ export function useStreamGenerate() {
   }
 
   function cancel() {
+    if (timeoutId) clearTimeout(timeoutId);
+    timeoutId = null;
+    timedOut = false;
     controller?.abort();
     controller = null;
   }

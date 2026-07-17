@@ -9,7 +9,7 @@ from django.test import SimpleTestCase
 from django.urls import resolve, reverse
 from rest_framework.test import APIRequestFactory, force_authenticate
 
-from .generation import StyleGenerationService
+from .generation import StyleGenerationService, StyleGenerationTimeout
 from .models import GenerationRecord
 from .views import GenerationFeedbackView, GenerationHistoryView, StyleGenerateView
 
@@ -38,7 +38,7 @@ class FakeEmbeddingProvider:
         self.vectors = list(vectors)
         self.calls = []
 
-    def embed(self, texts):
+    def embed(self, texts, *, timeout=None):
         self.calls.append(texts)
         return [self.vectors[len(self.calls) - 1]]
 
@@ -51,7 +51,11 @@ class StyleGenerationServiceTests(SimpleTestCase):
             user_id=self.user.id,
             style_vector=[1.0, 0.0],
             description="短句、自然、口语化",
-            features={"average_sentence_length": 12},
+            features={
+                "average_sentence_length": 12,
+                "top_words": [{"word": "其实", "count": 3}],
+            },
+            samples=["这是第一篇风格参考样本。" * 20, "这是第二篇风格参考样本。" * 20],
         )
 
     @patch("apps.styles.generation.GenerationRecord.objects.create")
@@ -80,6 +84,11 @@ class StyleGenerationServiceTests(SimpleTestCase):
         self.assertFalse(result.attempts[0].quality.accepted)
         self.assertTrue(result.attempts[1].quality.accepted)
         self.assertGreater(gateway.calls[1]["temperature"], gateway.calls[0]["temperature"])
+        self.assertEqual(
+            prompt_engine.contexts[0]["style_features"]["高频词"],
+            "其实",
+        )
+        self.assertEqual(len(prompt_engine.contexts[0]["style_samples"]), 2)
         self.assertIn("上一次未达标", prompt_engine.contexts[1]["constraints"][-1])
         self.assertIn("周末、咖啡", prompt_engine.contexts[0]["constraints"][-1])
         self.assertEqual(create_mock.call_args.kwargs["result"], "第二版")
@@ -145,12 +154,36 @@ class StyleGenerationServiceTests(SimpleTestCase):
         self.assertEqual(events[-1]["event"], "complete")
         self.assertEqual(events[-1]["data"]["generation_id"], str(record_id))
 
+    @patch("apps.styles.generation.GenerationRecord.objects.create")
+    def test_stops_retry_when_total_time_budget_is_exhausted(self, create_mock):
+        clock_values = iter([0, 0, 0, 0, 0, 31])
+        service = StyleGenerationService(
+            llm_gateway=FakeGateway([["未通过"], ["不应生成"]]),
+            prompt_engine=FakePromptEngine(),
+            embedding_provider=FakeEmbeddingProvider([[0.0, 1.0]]),
+            detector=lambda text: (0.1, []),
+            clock=lambda: next(clock_values),
+        )
+
+        with self.assertRaises(StyleGenerationTimeout):
+            service.generate(
+                user=self.user,
+                profile=self.profile,
+                topic="测试时间预算",
+            )
+
+        create_mock.assert_not_called()
+
 
 class StyleGenerationApiTests(SimpleTestCase):
     def setUp(self):
         self.factory = APIRequestFactory()
         self.user = SimpleNamespace(id=uuid.uuid4(), is_authenticated=True)
-        self.profile = SimpleNamespace(id=uuid.uuid4(), user_id=self.user.id)
+        self.profile = SimpleNamespace(
+            id=uuid.uuid4(),
+            user_id=self.user.id,
+            style_vector=[1.0],
+        )
 
     def test_generation_routes_resolve(self):
         self.assertIs(resolve("/api/v1/styles/generate").func.view_class, StyleGenerateView)
@@ -197,6 +230,28 @@ class StyleGenerationApiTests(SimpleTestCase):
         self.assertIn(json.dumps("你好", ensure_ascii=False), body)
         get_object_mock.assert_called_once()
         self.assertEqual(get_object_mock.call_args.kwargs["user"], self.user)
+
+    @patch("apps.styles.views.get_object_or_404")
+    def test_generation_rejects_profile_without_style_vector(self, get_object_mock):
+        get_object_mock.return_value = SimpleNamespace(
+            id=self.profile.id,
+            user_id=self.user.id,
+            style_vector=[],
+        )
+        request = self.factory.post(
+            "/api/v1/styles/generate",
+            {
+                "profile_id": str(self.profile.id),
+                "topic": "测试",
+            },
+            format="json",
+        )
+        force_authenticate(request, user=self.user)
+
+        response = StyleGenerateView.as_view()(request)
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.data["detail"].code, "style_profile_not_ready")
 
     @patch("apps.styles.views.GenerationRecord.objects.filter")
     def test_history_queryset_is_owner_scoped(self, filter_mock):

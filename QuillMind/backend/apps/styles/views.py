@@ -17,7 +17,7 @@ from core.llm import LLMError
 from core.prompts import PromptEngineError
 from core.style import EmbeddingError
 
-from .generation import StyleGenerationService
+from .generation import StyleGenerationService, StyleGenerationTimeout
 from .models import GenerationRecord, StyleProfile
 from .serializers import (
     GenerationFeedbackSerializer,
@@ -26,6 +26,7 @@ from .serializers import (
     StyleGenerationUnavailable,
     StyleProfileDetailSerializer,
     StyleProfileListSerializer,
+    StyleProfileNotReady,
     StyleProfileWriteSerializer,
 )
 
@@ -123,6 +124,8 @@ class StyleGenerateView(GenericAPIView):
             id=data["profile_id"],
             user=request.user,
         )
+        if not profile.style_vector:
+            raise StyleProfileNotReady()
         service = StyleGenerationService()
 
         if request.query_params.get("stream", "").lower() == "true":
@@ -152,7 +155,12 @@ class StyleGenerateView(GenericAPIView):
                 keywords=data["keywords"],
                 tone_slider=data["tone_slider"],
             )
-        except (EmbeddingError, LLMError, PromptEngineError) as exc:
+        except (
+            EmbeddingError,
+            LLMError,
+            PromptEngineError,
+            StyleGenerationTimeout,
+        ) as exc:
             raise StyleGenerationUnavailable() from exc
         return Response(GenerationRecordSerializer(result.record).data)
 
@@ -161,6 +169,12 @@ class StyleGenerateView(GenericAPIView):
             for event in events:
                 payload = json.dumps(event["data"], ensure_ascii=False)
                 yield f"event: {event['event']}\ndata: {payload}\n\n"
+        except StyleGenerationTimeout as exc:
+            payload = json.dumps(
+                {"detail": f"{exc} 请精简要求后重试。"},
+                ensure_ascii=False,
+            )
+            yield f"event: error\ndata: {payload}\n\n"
         except Exception:
             payload = json.dumps(
                 {"detail": "生成失败，请稍后重试。"},
