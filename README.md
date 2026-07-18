@@ -77,4 +77,4 @@ export WENMO_E2E_PASSWORD="一次性测试密码"
 python scripts/style_mvp_e2e.py
 ```
 
-详细操作见 [风格写作用户指南](docs/user-guide-style.md)。
+详细操作见 [风格写作用户指南](docs/user-guide-style.md)。11
