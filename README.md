@@ -35,6 +35,10 @@ STYLE_AI_FLAVOR_THRESHOLD=0.7
 STYLE_SIMILARITY_THRESHOLD=0.75
 STYLE_GENERATION_MAX_RETRIES=2
 STYLE_GENERATION_TIMEOUT_SECONDS=30
+CHAT_MAX_REPLY_LENGTH=150
+CHAT_HISTORY_MESSAGE_LIMIT=40
+CHAT_REPLY_BASE_TEMPERATURE=0.7
+CHAT_REGENERATE_TEMPERATURE=1.0
 ```
 
 ## 启动后端
@@ -50,6 +54,15 @@ python manage.py runserver
 ```
 
 API 文档：`http://127.0.0.1:8000/api/docs/`
+
+聊天流使用 WebSocket：
+
+```text
+ws://127.0.0.1:8000/ws/chat/{session_id}/?token={JWT_ACCESS_TOKEN}
+```
+
+发送 `{"action":"message","content":"对方说的话"}` 获取 token 流；发送
+`{"action":"regenerate"}` 可基于同一上下文换一条回复。
 
 ## 启动前端
 

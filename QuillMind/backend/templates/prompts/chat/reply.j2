@@ -16,6 +16,11 @@
 {{ latest_emotion }}
 {% endif %}
 
+{% if strategy_instruction | default("") %}
+## 本次回复策略
+{{ strategy_instruction }}
+{% endif %}
+
 ## 回复要求
 - 回复不超过 {{ max_chars | default(150) }} 字。
 - 先回应对方刚说的内容，再自然推进目标。

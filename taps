@@ -526,18 +526,18 @@ P0 工具链
 |----|------|
 | 负责人 | BE |
 | 操作 | |
-| | ☐ 安装配置 `channels`, `channels-redis` |
-| | ☐ `POST /api/v1/chat/sessions/{id}/messages`： |
+| | ☑ 安装配置 `channels`, `channels-redis` |
+| | ☑ `POST /api/v1/chat/sessions/{id}/messages`： |
 | | &nbsp;&nbsp;• 用户输入「对方说的话」 |
 | | &nbsp;&nbsp;• 情绪分类（规则：含「累/烦/不想」→ 负面） |
 | | &nbsp;&nbsp;• 渲染 `chat/reply.j2` → LLM stream |
 | | &nbsp;&nbsp;• 追加 messages 数组 |
-| | ☐ WebSocket `/ws/chat/{session_id}/`： |
+| | ☑ WebSocket `/ws/chat/{session_id}/`： |
 | | &nbsp;&nbsp;• 鉴权（JWT query param） |
 | | &nbsp;&nbsp;• 推送 token 流 |
-| | ☐ `POST .../suggestions`：一次生成 3 条不同策略回复 |
-| | ☐ 「换一条」：同一 context + 提高 temperature 重生成 |
-| | ☐ 每条回复 ≤ 150 字后处理截断 |
+| | ☑ `POST .../suggestions`：一次生成 3 条不同策略回复 |
+| | ☑ 「换一条」：同一 context + 提高 temperature 重生成 |
+| | ☑ 每条回复 ≤ 150 字后处理截断 |
 | 产出 | 消息 API + WebSocket 流 |
 | 验收 | 20 轮对话不报错；人设 prompt 前后一致 |
 
@@ -547,11 +547,11 @@ P0 工具链
 |----|------|
 | 负责人 | FE |
 | 操作 | |
-| | ☐ 路由 `/chat` |
-| | ☐ 场景卡片网格（图标 + 标题 + 描述） |
-| | ☐ 表单：关系下拉、目标描述、可选绑定风格档案 |
-| | ☐ 创建后跳转 `/chat/:id` |
-| | ☐ 左侧：历史会话列表 |
+| | ☑ 路由 `/chat` |
+| | ☑ 场景卡片网格（图标 + 标题 + 描述） |
+| | ☑ 表单：关系下拉、目标描述、可选绑定风格档案 |
+| | ☑ 创建后跳转 `/chat/:id` |
+| | ☑ 左侧：历史会话列表 |
 | 产出 | 聊天入口页 |
 | 验收 | 各预设场景均可创建会话 |
 
@@ -561,15 +561,15 @@ P0 工具链
 |----|------|
 | 负责人 | FE |
 | 操作 | |
-| | ☐ 路由 `/chat/:id` |
-| | ☐ IM 风格 UI：左侧 AI 气泡、右侧「对方」输入 |
-| | ☐ 流式打字效果（WebSocket 或 SSE） |
+| | ☑ 路由 `/chat/:id` |
+| | ☑ IM 风格 UI：左侧 AI 气泡、右侧「对方」输入 |
+| | ☑ 流式打字效果（WebSocket 或 SSE） |
 | | ☐ 底部工具栏： |
-| | &nbsp;&nbsp;• 「生成 3 条建议」 |
-| | &nbsp;&nbsp;• 「太 AI 了，换一条」 |
-| | &nbsp;&nbsp;• 复制到剪贴板 |
-| | ☐ 移动端适配：全屏聊天布局 |
-| | ☐ `stores/chat.ts` + `composables/useChat.ts` |
+| | &nbsp;&nbsp;• ☑「生成 3 条建议」 |
+| | &nbsp;&nbsp;• ☑「太 AI 了，换一条」 |
+| | &nbsp;&nbsp;• ☑ 复制到剪贴板 |
+| | ☑ 移动端适配：全屏聊天布局 |
+| | ☑ `stores/chat.ts` + `composables/useChat.ts` |
 | 产出 | 完整聊天 UI |
 | 验收 | new-needs 3.3 节验收标准全部通过 |
 

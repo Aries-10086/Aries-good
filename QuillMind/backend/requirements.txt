@@ -12,4 +12,7 @@ openai
 jinja2
 jieba
 python-docx
+channels
+channels-redis
+daphne
 

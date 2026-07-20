@@ -51,6 +51,12 @@ const routes = [
     meta: { title: "聊天" },
   },
   {
+    path: "/chat/:id",
+    name: "chat-session",
+    component: () => import("@/views/ChatAssistant/ChatSessionView.vue"),
+    meta: { title: "聊天会话" },
+  },
+  {
     path: "/documents",
     name: "documents",
     component: () => import("@/views/DocumentReview/DocumentReviewView.vue"),

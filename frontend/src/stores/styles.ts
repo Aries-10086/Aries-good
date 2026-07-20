@@ -29,13 +29,17 @@ export const useStylesStore = defineStore("styles", {
     creating: false,
   }),
   actions: {
-    async fetchProfiles(page = this.page) {
+    async fetchProfiles(page?: number) {
+      const targetPage = page ?? this.page;
       this.loading = true;
       try {
-        const response = await stylesApi.listStyleProfiles(page, this.pageSize);
+        const response = await stylesApi.listStyleProfiles(
+          targetPage,
+          this.pageSize,
+        );
         this.profiles = response.results;
         this.total = response.count;
-        this.page = page;
+        this.page = targetPage;
       } finally {
         this.loading = false;
       }

@@ -17,6 +17,41 @@ class PersonaGenerationUnavailable(APIException):
     default_code = "persona_generation_unavailable"
 
 
+class ChatGenerationUnavailable(APIException):
+    status_code = 503
+    default_detail = "消息生成服务暂时不可用，请稍后重试。"
+    default_code = "chat_generation_unavailable"
+
+
+class ChatMessageRequestSerializer(serializers.Serializer):
+    content = serializers.CharField(
+        required=False,
+        allow_blank=False,
+        max_length=2000,
+    )
+    regenerate = serializers.BooleanField(required=False, default=False)
+
+    def validate(self, attrs):
+        if not attrs.get("regenerate") and not attrs.get("content"):
+            raise serializers.ValidationError({"content": "请输入对方说的话。"})
+        return attrs
+
+
+class ChatMessageResponseSerializer(serializers.Serializer):
+    message = serializers.DictField()
+    emotion = serializers.ChoiceField(choices=("negative", "neutral"))
+    messages = serializers.ListField(child=serializers.DictField())
+
+
+class ChatSuggestionRequestSerializer(serializers.Serializer):
+    regenerate = serializers.BooleanField(required=False, default=False)
+
+
+class ChatSuggestionResponseSerializer(serializers.Serializer):
+    suggestions = serializers.ListField(child=serializers.CharField())
+    regenerate = serializers.BooleanField()
+
+
 class ChatSessionSerializer(serializers.ModelSerializer):
     session_id = serializers.UUIDField(source="id", read_only=True)
     style_profile_id = serializers.UUIDField(

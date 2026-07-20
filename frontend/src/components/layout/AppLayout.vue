@@ -3,7 +3,11 @@
     <RouterView />
   </main>
 
-  <el-container v-else class="app-shell">
+  <el-container
+    v-else
+    class="app-shell"
+    :class="{ 'app-shell--chat-session': isChatSession }"
+  >
     <el-aside class="app-sidebar" width="240px">
       <div class="brand">
         <span class="brand-mark">W</span>
@@ -58,9 +62,13 @@ const navItems = [
 
 const currentTitle = computed(() => String(route.meta.title ?? "首页"));
 const isAuthLayout = computed(() => Boolean(route.meta.authLayout));
+const isChatSession = computed(() => route.name === "chat-session");
 const activeMenu = computed(() => {
   if (route.path.startsWith("/style")) {
     return "/style";
+  }
+  if (route.path.startsWith("/chat")) {
+    return "/chat";
   }
   return route.path;
 });
@@ -160,5 +168,16 @@ const activeMenu = computed(() => {
 
 .app-main {
   padding: 32px;
+}
+
+@media (max-width: 760px) {
+  .app-shell--chat-session .app-sidebar,
+  .app-shell--chat-session .app-header {
+    display: none;
+  }
+
+  .app-shell--chat-session .app-main {
+    padding: 0;
+  }
 }
 </style>

@@ -14,6 +14,7 @@ DEBUG = False
 ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
 INSTALLED_APPS = [
+    "daphne",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -22,6 +23,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "corsheaders",
+    "channels",
     "rest_framework",
     "drf_spectacular",
     "apps.documents",
@@ -116,6 +118,12 @@ SIMPLE_JWT = {
 }
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {"hosts": [REDIS_URL]},
+    }
+}
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", REDIS_URL)
 CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", REDIS_URL)
 CELERY_TASK_TRACK_STARTED = True
@@ -147,6 +155,14 @@ STYLE_SAMPLE_MAX_FILE_BYTES = int(
 )
 LLM_PROVIDER_ORDER = os.getenv("LLM_PROVIDER_ORDER", "openai")
 LLM_RATE_LIMIT_PER_MINUTE = int(os.getenv("LLM_RATE_LIMIT_PER_MINUTE", "20"))
+CHAT_MAX_REPLY_LENGTH = int(os.getenv("CHAT_MAX_REPLY_LENGTH", "150"))
+CHAT_HISTORY_MESSAGE_LIMIT = int(os.getenv("CHAT_HISTORY_MESSAGE_LIMIT", "40"))
+CHAT_REPLY_BASE_TEMPERATURE = float(
+    os.getenv("CHAT_REPLY_BASE_TEMPERATURE", "0.7"),
+)
+CHAT_REGENERATE_TEMPERATURE = float(
+    os.getenv("CHAT_REGENERATE_TEMPERATURE", "1.0"),
+)
 LLM_MODEL_PRICING_USD_PER_1K_TOKENS = {
     # Approximate defaults for logging only; keep billing source of truth external.
     "gpt-4o": {"input": 0.005, "output": 0.015},
