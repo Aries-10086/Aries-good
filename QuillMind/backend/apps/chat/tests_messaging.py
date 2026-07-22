@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 import uuid
@@ -17,11 +18,14 @@ from .auth import JWTQueryAuthMiddleware
 from .consumers import ChatConsumer
 from .messaging import (
     MAX_REPLY_CHARS,
+    FORBIDDEN_WORDS,
+    SCENE_GUIDANCE,
     ChatReply,
     ChatMessageService,
     classify_emotion,
     truncate_reply,
 )
+from .models import ChatSession
 from .views import ChatMessageView, ChatSuggestionView
 
 
@@ -35,6 +39,14 @@ PERSONA = {
     "avoid_phrases": ["务必"],
     "success_signal": "对方愿意继续沟通",
 }
+SCENARIO_FIXTURES = json.loads(
+    (
+        Path(__file__).resolve().parents[4]
+        / "docs"
+        / "eval"
+        / "chat_scenarios.json"
+    ).read_text(encoding="utf-8")
+)
 
 
 class FakePromptEngine:
@@ -57,12 +69,13 @@ class FakeStreamGateway:
         yield from output
 
 
-def make_session():
+def make_session(*, scene=ChatSession.Scene.CUSTOM):
     return SimpleNamespace(
         id=uuid.uuid4(),
         user_id=uuid.uuid4(),
         persona=PERSONA,
         goal="邀请朋友周末聚餐",
+        scene=scene,
         messages=[],
         updated_at=None,
     )
@@ -176,6 +189,61 @@ class ChatMessageServiceTests(SimpleTestCase):
             len(prompt_engine.contexts[-1]["messages"]),
             40,
         )
+
+    def test_each_preset_scene_keeps_persona_for_ten_rounds(self):
+        for scene, fixture in SCENARIO_FIXTURES.items():
+            with self.subTest(scene=scene):
+                session = make_session(scene=scene)
+                session.goal = fixture["goal"]
+                prompt_engine = FakePromptEngine()
+                service = ChatMessageService(
+                    llm_gateway=FakeStreamGateway([["好，我们慢慢说。"]]),
+                    prompt_engine=prompt_engine,
+                )
+                install_in_memory_persistence(service, session)
+
+                for content in fixture["messages"]:
+                    service.reply(session=session, content=content)
+
+                self.assertEqual(len(fixture["messages"]), 10)
+                self.assertEqual(len(session.messages), 20)
+                self.assertEqual(len(prompt_engine.contexts), 10)
+                self.assertTrue(
+                    all(
+                        json.loads(context["persona"]) == PERSONA
+                        and context["scene_guidance"] == SCENE_GUIDANCE[scene]
+                        and context["max_chars"] == MAX_REPLY_CHARS
+                        for context in prompt_engine.contexts
+                    )
+                )
+                self.assertEqual(
+                    [
+                        context["latest_emotion"]
+                        for context in prompt_engine.contexts
+                    ],
+                    [
+                        "负面" if classify_emotion(content) == "negative" else "中性"
+                        for content in fixture["messages"]
+                    ],
+                )
+
+    def test_prompt_context_contains_emotion_and_ai_flavor_controls(self):
+        session = make_session(scene=ChatSession.Scene.COMFORT)
+        prompt_engine = FakePromptEngine()
+        service = ChatMessageService(
+            llm_gateway=FakeStreamGateway([["听起来确实挺累的，先缓一缓吧。"]]),
+            prompt_engine=prompt_engine,
+        )
+        install_in_memory_persistence(service, session)
+
+        service.reply(session=session, content="最近很烦，什么都不想做")
+
+        context = prompt_engine.contexts[0]
+        self.assertEqual(context["latest_emotion"], "负面")
+        self.assertEqual(context["scene"], "安慰")
+        self.assertIn("不急着讲道理", context["scene_guidance"])
+        self.assertIn("作为一个AI", context["forbidden_words"])
+        self.assertEqual(context["forbidden_words"], FORBIDDEN_WORDS)
 
 
 @override_settings(

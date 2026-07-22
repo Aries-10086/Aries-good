@@ -1,31 +1,13 @@
-你正在替用户思考下一句怎么说。请保持人设稳定，结合完整上下文生成一条可以直接发送的中文消息。
+from django.db import migrations
 
-## 人设卡片
-{{ persona }}
 
-## 本轮目标
-{{ goal }}
-
-## 当前场景
+SCENE_SECTION = """## 当前场景
 {{ scene | default("自定义") }}
 场景调优要求：{{ scene_guidance | default("依据人设和关系自然回应。") }}
 
-## 对话记录
-{% for message in messages %}
-{{ message.get("role", "unknown") }}：{{ message.get("content", "") }}
-{% endfor %}
+"""
 
-{% if latest_emotion | default("") %}
-## 对方当前情绪
-{{ latest_emotion }}
-{% endif %}
-
-{% if strategy_instruction | default("") %}
-## 本次回复策略
-{{ strategy_instruction }}
-{% endif %}
-
-## 回复要求
+REPLY_REQUIREMENTS = """## 回复要求
 - 回复不超过 {{ max_chars | default(150) }} 字。
 - 通常用 1—3 个短句、20—80 字；像真人即时聊天，不写成通知、总结或小作文。
 - 先回应对方刚说的内容，再自然推进目标；若对方情绪为负面，先接住情绪并弱化或暂停推进。
@@ -42,4 +24,37 @@
 - 禁止捏造对方没说过的事实，禁止前后人设矛盾。
 {% for word in forbidden_words | default([]) %}
 - 禁止使用“{{ word }}”。
-{% endfor %}
+{% endfor %}"""
+
+
+def tune_chat_reply_prompt(apps, schema_editor):
+    PromptTemplate = apps.get_model("prompts", "PromptTemplate")
+    template = PromptTemplate.objects.filter(
+        module="chat/reply",
+        version="v1.0.0",
+    ).first()
+    if not template:
+        return
+
+    content = template.content
+    if "## 当前场景" not in content:
+        content = content.replace(
+            "## 对话记录",
+            f"{SCENE_SECTION}## 对话记录",
+        )
+    requirements_start = content.find("## 回复要求")
+    if requirements_start >= 0:
+        content = content[:requirements_start] + REPLY_REQUIREMENTS
+    template.content = content
+    template.changelog = "按场景调优口语化、负面情绪响应、人设稳定与 AI 味约束"
+    template.save(update_fields=("content", "changelog", "updated_at"))
+
+
+class Migration(migrations.Migration):
+    dependencies = [
+        ("prompts", "0004_add_chat_reply_strategy"),
+    ]
+
+    operations = [
+        migrations.RunPython(tune_chat_reply_prompt, migrations.RunPython.noop),
+    ]

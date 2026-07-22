@@ -1,0 +1,42 @@
+{
+  "version": "1.0",
+  "purpose": "模块三场景调优回归样本；expected_rules 用于人工抽检模型回复。",
+  "cases": [
+    {
+      "scene": "invite_dinner",
+      "counterpart": "这周事情有点多，可能没空。",
+      "bad_reply": "我理解您的感受。聚餐有助于增进关系，希望您合理安排时间。",
+      "expected_rules": ["不用客服腔", "保留拒绝空间", "不连续追问"]
+    },
+    {
+      "scene": "persuade_game",
+      "counterpart": "我不太会玩，怕拖你们后腿。",
+      "bad_reply": "首先你需要建立信心，其次熟悉规则，最后融入团队。",
+      "expected_rules": ["不用首先其次最后", "不激将", "提供低成本试玩或退出选择"]
+    },
+    {
+      "scene": "comfort",
+      "counterpart": "最近真的很累，什么都不想做。",
+      "bad_reply": "建议您适当休息并制定计划，保持积极心态，一切都会好起来。",
+      "expected_rules": ["先接住负面情绪", "不强行积极", "未求助时少给建议"]
+    },
+    {
+      "scene": "urge",
+      "counterpart": "还没弄完，晚点再说。",
+      "bad_reply": "你怎么又没完成？大家都在等你，务必马上处理。",
+      "expected_rules": ["不指责或道德绑架", "说清事项和时间点", "只给一个下一步"]
+    },
+    {
+      "scene": "custom",
+      "counterpart": "你别管我了。",
+      "bad_reply": "作为一个 AI，我建议你冷静下来。以下是三个可行方案。",
+      "expected_rules": ["不暴露 AI 身份", "不输出方案清单", "保持既有人设和关系"]
+    },
+    {
+      "scene": "comfort",
+      "counterpart": "烦死了，今天不想聊。",
+      "bad_reply": "听起来你很烦。为什么烦？发生了什么？要不要跟我说说？",
+      "expected_rules": ["尊重暂时不聊的边界", "最多一个问题", "不复述后连续追问"]
+    }
+  ]
+}

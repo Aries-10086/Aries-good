@@ -164,6 +164,10 @@ class PromptV1TemplateTests(SimpleTestCase):
                     }
                 ],
             },
+            "documents/review": {
+                "document_type": "合同",
+                "text": "服务费用在任何情况下均不退还。",
+            },
         }
 
         for module, context in cases.items():

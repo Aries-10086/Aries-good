@@ -579,12 +579,12 @@ P0 工具链
 |----|------|
 | 负责人 | AI + PM |
 | 操作 | |
-| | ☐ 每个预设场景测试 10 轮对话 |
-| | ☐ 调 prompt：口语化程度、字数、情绪响应 |
-| | ☐ 收集「AI 味」bad case → 更新禁止词 / 模板 |
-| | ☐ 编写 `docs/user-guide-chat.md` |
-| 产出 | 模块三可演示 |
-| 验收 | 人工抽检 5 个会话，人设不漂移 |
+| | ☑ 每个预设场景测试 10 轮对话（自动化回归覆盖 4 个预设场景） |
+| | ☑ 调 prompt：口语化程度、字数、情绪响应 |
+| | ☑ 收集「AI 味」bad case → 更新禁止词 / 模板 |
+| | ☑ 编写 `docs/user-guide-chat.md` |
+| 产出 | ☑ 模块三代码与演示文档已就绪 |
+| 验收 | ◐ 自动化人设稳定性检查通过；真实模型 5 个会话人工抽检待执行 |
 
 ### P4 里程碑验收
 
@@ -622,15 +622,15 @@ P0 工具链
 |----|------|
 | 负责人 | BE + AI |
 | 操作 | |
-| | ☐ `core/inference/document_reviewer.py`： |
+| | ☑ `core/inference/document_reviewer.py`： |
 | | &nbsp;&nbsp;• 加载 ONNX Runtime Session |
 | | &nbsp;&nbsp;• 文本预处理：分段（512 token/chunk）、编码 |
 | | &nbsp;&nbsp;• 推理 → `[{type, score, start, end, level}]` |
-| | ☐ 合并多段结果、去重、按置信度排序 |
-| | ☐ 支持 `model_version` 参数（蓝绿切换） |
-| | ☐ **Baseline**：`LLMReviewProvider` 纯 LLM 分析（P5 第一周可用） |
-| 产出 | 推理类 + LLM fallback |
-| 验收 | 1 万字文本推理 < 30 秒；返回结构化 risks JSON |
+| | ☑ 合并多段结果、去重、按置信度排序 |
+| | ☑ 支持 `model_version` 参数（蓝绿切换） |
+| | ☑ **Baseline**：`LLMReviewProvider` 纯 LLM 分析（P5 第一周可用） |
+| 产出 | ☑ 推理类 + LLM fallback |
+| 验收 | ◐ 1 万字合成推理测试 < 30 秒且返回结构化 risks JSON；真实 ONNX 模型待 Step 5.1 产物实测 |
 
 ### Step 5.3 后端 — 异步检索任务
 

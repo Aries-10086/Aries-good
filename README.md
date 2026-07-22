@@ -39,7 +39,15 @@ CHAT_MAX_REPLY_LENGTH=150
 CHAT_HISTORY_MESSAGE_LIMIT=40
 CHAT_REPLY_BASE_TEMPERATURE=0.7
 CHAT_REGENERATE_TEMPERATURE=1.0
+DOCUMENT_MODEL_PATH=backend/models/document_review/v1.0.0/model.onnx
+DOCUMENT_MODEL_VERSION=v1.0.0
+DOCUMENT_REVIEW_MAX_TOKENS=512
+DOCUMENT_REVIEW_CHUNK_STRIDE=64
+DOCUMENT_REVIEW_SCORE_THRESHOLD=0.5
 ```
+
+也可使用 `DOCUMENT_REVIEW_MODEL_ROOT` 和
+`DOCUMENT_REVIEW_MODEL_VERSION` 覆盖模型根目录及默认版本。
 
 ## 启动后端
 
@@ -90,4 +98,5 @@ export WENMO_E2E_PASSWORD="一次性测试密码"
 python scripts/style_mvp_e2e.py
 ```
 
-详细操作见 [风格写作用户指南](docs/user-guide-style.md)。111
+详细操作见[风格写作用户指南](docs/user-guide-style.md)和
+[沟通助手用户指南](docs/user-guide-chat.md)。

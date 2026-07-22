@@ -15,4 +15,7 @@ python-docx
 channels
 channels-redis
 daphne
+numpy
+onnxruntime
+transformers
 

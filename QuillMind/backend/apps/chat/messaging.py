@@ -17,7 +17,18 @@ from .models import ChatSession
 
 MAX_REPLY_CHARS = settings.CHAT_MAX_REPLY_LENGTH
 HISTORY_MESSAGE_LIMIT = settings.CHAT_HISTORY_MESSAGE_LIMIT
-NEGATIVE_WORDS = ("累", "烦", "不想")
+NEGATIVE_WORDS = (
+    "累",
+    "烦",
+    "不想",
+    "难过",
+    "生气",
+    "崩溃",
+    "委屈",
+    "失望",
+    "算了",
+    "没心情",
+)
 FORBIDDEN_WORDS = (
     "赋能",
     "抓手",
@@ -25,7 +36,28 @@ FORBIDDEN_WORDS = (
     "在当今时代",
     "值得注意的是",
     "具有重要意义",
+    "作为一个AI",
+    "以下是",
+    "希望以上内容对你有所帮助",
+    "总的来说",
 )
+SCENE_GUIDANCE = {
+    ChatSession.Scene.INVITE_DINNER: (
+        "自然提出一个具体邀约，给出时间或地点即可；保留拒绝空间，不连续追问。"
+    ),
+    ChatSession.Scene.PERSUADE_GAME: (
+        "像朋友聊天一样轻松，可提出低成本试玩；不贬低、不激将，并允许对方退出。"
+    ),
+    ChatSession.Scene.COMFORT: (
+        "优先接住情绪，不急着讲道理、给方案或强行积极；对方未求助时少提建议。"
+    ),
+    ChatSession.Scene.URGE: (
+        "礼貌说清事项、时间点和下一步，只催当前任务；不指责、不阴阳怪气。"
+    ),
+    ChatSession.Scene.CUSTOM: (
+        "严格依据人设、关系和目标回应，不擅自补充身份或改变双方关系。"
+    ),
+}
 SUGGESTION_STRATEGIES = (
     "先共情回应，再温和推进目标；避免说教。",
     "表达直接但不生硬，给对方一个容易回答的选择。",
@@ -181,12 +213,18 @@ class ChatMessageService:
         emotion: str,
         strategy_instruction: str,
     ) -> str:
+        scene = str(getattr(session, "scene", ChatSession.Scene.CUSTOM))
         return self.prompt_engine.render(
             "chat/reply",
             version=None,
             user_id=session.user_id,
             persona=json.dumps(session.persona, ensure_ascii=False, indent=2),
             goal=session.goal,
+            scene=dict(ChatSession.Scene.choices).get(scene, scene),
+            scene_guidance=SCENE_GUIDANCE.get(
+                scene,
+                SCENE_GUIDANCE[ChatSession.Scene.CUSTOM],
+            ),
             messages=self._prompt_messages(messages),
             latest_emotion="负面" if emotion == "negative" else "中性",
             max_chars=MAX_REPLY_CHARS,
