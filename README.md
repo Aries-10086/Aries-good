@@ -99,4 +99,4 @@ python scripts/style_mvp_e2e.py
 ```
 
 详细操作见[风格写作用户指南](docs/user-guide-style.md)和
-[沟通助手用户指南](docs/user-guide-chat.md)。1111
+[沟通助手用户指南](docs/user-guide-chat.md)。111111
