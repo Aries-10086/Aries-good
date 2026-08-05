@@ -84,9 +84,9 @@ P0 工具链
 | 负责人 | DevOps + BE |
 | 输入 | 无 |
 | 操作 | |
-| | ☐ 创建 Git 仓库 `wenmo`，添加 `.gitignore`（Python、Node、.env、models/） |
-| | ☐ 建立目录：`backend/`、`frontend/`、`docker/`、`docs/`、`scripts/` |
-| | ☐ 添加 `README.md`：项目简介、本地启动 3 行命令、目录说明 |
+| | ☑ 创建 Git 仓库 `wenmo`，添加 `.gitignore`（Python、Node、.env、models/） |
+| | ☑ 建立目录：`QuillMind/backend/`、`frontend/`、`docker/`、`docs/`、`scripts/` |
+| | ☑ 添加 `README.md`：项目简介、本地启动 3 行命令、目录说明 |
 | | ☐ 添加 `LICENSE`（如 MIT） |
 | 产出 | 可 clone 的空仓库结构 |
 | 验收 | `git clone` 后目录清晰，README 可读懂 |
@@ -98,13 +98,13 @@ P0 工具链
 | 负责人 | DevOps |
 | 输入 | Step 0.1 |
 | 操作 | |
-| | ☐ 编写 `docker/docker-compose.dev.yml`，包含： |
+| | ☑ 编写 `docker/docker-compose.dev.yml`，包含： |
 | | &nbsp;&nbsp;• `redis:7`（端口 6379，Celery broker + 缓存） |
 | | &nbsp;&nbsp;• **不包含 PostgreSQL**（数据库走云端，见 Step 0.2b） |
 | | &nbsp;&nbsp;• 可选 `postgres:16`，挂 `profiles: ["offline"]`，仅离线调试 |
-| | ☐ 编写 `docker/.env.example`（`DATABASE_URL`、Redis URL，见 10.2 节） |
-| | ☐ 编写 `scripts/dev-up.sh`：`docker compose up -d redis` |
-| | ☐ 编写 `scripts/dev-down.sh` |
+| | ☑ 编写 `docker/.env.example`（`DATABASE_URL`、Redis URL，见 10.2 节） |
+| | ☑ 编写 `scripts/dev-up.sh`：`docker compose up -d redis` |
+| | ☑ 编写 `scripts/dev-down.sh` |
 | 产出 | `docker compose up` 后 Redis 可用 |
 | 验收 | `redis-cli ping` 返回 PONG |
 
@@ -120,7 +120,7 @@ P0 工具链
 | | ☐ 创建数据库与用户（如 `wenmo_dev`），授予 DDL/DML 权限 |
 | | ☐ 配置访问：开发者公网 IP 白名单（prod 阶段改 VPC / 内网） |
 | | ☐ 获取连接串，写入 `.env`：`DATABASE_URL=postgresql://...?sslmode=require` |
-| | ☐ 编写 `docs/database.md`：实例信息、连接方式、**禁止提交真实密码** |
+| | ☑ 编写 `docs/database.md`：实例信息、连接方式、**禁止提交真实密码** |
 | | ☐ 验证连通：`psql "$DATABASE_URL" -c "SELECT 1"` 或 Django `manage.py dbshell` |
 | 产出 | 团队共享的云端 dev 数据库 + 文档 |
 | 验收 | 所有开发者用同一 `DATABASE_URL` 模板（各自 `.env` 本地保存）可连库 |
@@ -147,12 +147,12 @@ P0 工具链
 |----|------|
 | 负责人 | DevOps |
 | 操作 | |
-| | ☐ GitHub Actions / GitLab CI： |
-| | &nbsp;&nbsp;• `lint` job（backend ruff + frontend eslint） |
-| | &nbsp;&nbsp;• `test` job（占位，P1 后补真实测试） |
-| | ☐ CI 仅在 PR 到 `develop` / `main` 时触发 |
-| 产出 | `.github/workflows/ci.yml` |
-| 验收 | 任意 PR 自动跑 lint 并通过 |
+| | ◐ GitHub Actions / GitLab CI： |
+| | &nbsp;&nbsp;• `lint` job（backend ruff + frontend eslint）— 待补 |
+| | &nbsp;&nbsp;• `test` job（backend `manage.py test` + frontend build） |
+| | ☑ CI 仅在 PR 到 `develop` / `main` 时触发 |
+| 产出 | ☑ `.github/workflows/ci.yml` |
+| 验收 | ◐ 任意 PR 自动跑 test/build；lint job 待补 |
 
 ### P0 里程碑验收
 
@@ -638,22 +638,23 @@ P0 工具链
 |----|------|
 | 负责人 | BE |
 | 操作 | |
-| | ☐ Celery task `review_document_task(task_id, text, doc_type)` |
-| | ☐ `POST /api/v1/documents/review`： |
+| | ☑ Celery task `review_document_task(task_id, review_id, model_version?)` |
+| | ☑ `POST /api/v1/documents/review`： |
 | | &nbsp;&nbsp;• 校验文本 ≤ 20,000 字 |
 | | &nbsp;&nbsp;• doc_type: contract / report / testimony / general |
 | | &nbsp;&nbsp;• 创建 AsyncTask + DocumentReview 记录 |
 | | &nbsp;&nbsp;• 投递 Celery → 返回 task_id |
-| | ☐ Task 内部流程： |
-| | &nbsp;&nbsp;1. ONNX 推理 → risks[] |
+| | ☑ Task 内部流程： |
+| | &nbsp;&nbsp;1. ONNX/LLM 推理 → risks[] |
 | | &nbsp;&nbsp;2. `documents/report.j2` + LLM → 自然语言报告 |
 | | &nbsp;&nbsp;3. deai 检测报告 → 不达标则重写 |
 | | &nbsp;&nbsp;4. 更新 DocumentReview + AsyncTask status |
-| | ☐ `GET /api/v1/documents/review/{task_id}`：状态 + 结果 |
-| | ☐ `GET /api/v1/documents/reviews`：历史 |
-| | ☐ `GET /api/v1/documents/reviews/{id}`：详情 |
-| 产出 | 完整检索 API |
-| 验收 | 10,000 字以内总耗时 ≤ 60 秒 |
+| | ☑ `GET /api/v1/documents/review/{task_id}`：状态 + 结果 |
+| | ☑ `GET /api/v1/documents/reviews`：历史 |
+| | ☑ `GET /api/v1/documents/reviews/{id}`：详情 |
+| | ☑ 编写 `scripts/document_review_e2e.py` |
+| 产出 | ☑ 完整检索 API |
+| 验收 | ◐ 10,000 字以内总耗时 ≤ 60 秒（代码与 mock 测试已通过；待 dev 环境 + Celery worker 实跑） |
 
 ### Step 5.4 前端 — 上传与分析页
 
@@ -661,13 +662,13 @@ P0 工具链
 |----|------|
 | 负责人 | FE |
 | 操作 | |
-| | ☐ 路由 `/review` |
-| | ☐ 文本粘贴区 + 文件上传（txt/docx） |
-| | ☐ 文档类型选择器 |
-| | ☐ 提交 → 进度条（轮询 task 状态） |
-| | ☐ 完成后跳转 `/review/:id` |
-| 产出 | 上传分析页 |
-| 验收 | 提交后 60 秒内看到结果 |
+| | ☑ 路由 `/documents`（兼容重定向 `/review`） |
+| | ☑ 文本粘贴区 + 文件上传（txt/docx） |
+| | ☑ 文档类型选择器 |
+| | ☑ 提交 → 进度条（轮询 task 状态） |
+| | ☑ 完成后跳转 `/documents/:id` |
+| 产出 | ☑ 上传分析页 |
+| 验收 | ◐ 提交后 60 秒内看到结果（待 dev 环境 + worker 实跑） |
 
 ### Step 5.5 前端 — 报告详情页
 
@@ -675,14 +676,14 @@ P0 工具链
 |----|------|
 | 负责人 | FE |
 | 操作 | |
-| | ☐ 路由 `/review/:id` |
-| | ☐ 组件 `RiskHighlight`：原文 + 风险 span 高亮（高/中/低 三色） |
-| | ☐ 侧边栏：风险列表（类型、等级、摘要） |
-| | ☐ 主区域：自然语言报告（Markdown 渲染） |
-| | ☐ 操作：导出 Markdown、复制报告 |
+| | ☑ 路由 `/documents/:id`（兼容重定向 `/review/:id`） |
+| | ☑ 组件 `RiskHighlight`：原文 + 风险 span 高亮（高/中/低 三色） |
+| | ☑ 侧边栏：风险列表（类型、等级、摘要） |
+| | ☑ 主区域：自然语言报告（Markdown 渲染） |
+| | ☑ 操作：导出 Markdown、复制报告 |
 | | ☐ （二期）导出 PDF |
-| 产出 | 报告详情页 |
-| 验收 | 风险点与原文位置对应；报告可读、无 AI 腔 |
+| 产出 | ☑ 报告详情页 |
+| 验收 | ◐ 风险点与原文位置对应；报告可读、无 AI 腔（前端 build 已通过；待联调验收） |
 
 ### Step 5.6 模型迭代与灰度
 
@@ -699,10 +700,10 @@ P0 工具链
 
 ### P5 里程碑验收
 
-- [ ] 20,000 字以内可分析
-- [ ] 合同风险召回率 ≥ 85%（标注集）
-- [ ] 报告 ≤ 60 秒且通过去 AI 味检测
-- [ ] 历史记录可回看
+- [x] 20,000 字以内可分析
+- [ ] 合同风险召回率 ≥ 85%（标注集，依赖 Step 5.1 ONNX 模型）
+- [ ] 报告 ≤ 60 秒且通过去 AI 味检测（待 dev 环境实跑）
+- [x] 历史记录可回看
 
 ---
 

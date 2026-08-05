@@ -192,3 +192,49 @@ export type AsyncTask = {
   created_at: string;
   updated_at: string;
 };
+
+export type DocumentReviewDocType =
+  | "contract"
+  | "report"
+  | "testimony"
+  | "general";
+
+export type DocumentRisk = {
+  type: string;
+  score: number;
+  start: number;
+  end: number;
+  level: "高" | "中" | "低" | string;
+  quote?: string;
+  reason?: string;
+  suggestion?: string;
+};
+
+export type DocumentReviewSummary = {
+  review_id: string;
+  doc_type: DocumentReviewDocType;
+  risk_count: number;
+  model_version: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DocumentReviewDetail = {
+  review_id: string;
+  doc_type: DocumentReviewDocType;
+  raw_text: string;
+  risks: DocumentRisk[];
+  report: string;
+  model_version: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DocumentReviewTaskResponse = {
+  task_id: string;
+  review_id: string;
+  status: AsyncTaskStatus;
+  result?: Record<string, unknown>;
+  error?: string;
+  review?: DocumentReviewDetail;
+};

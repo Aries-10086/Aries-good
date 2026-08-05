@@ -5,7 +5,7 @@ from .models import DocumentReview
 
 @admin.register(DocumentReview)
 class DocumentReviewAdmin(admin.ModelAdmin):
-    list_display = ("id", "user", "model_version", "created_at", "updated_at")
-    list_filter = ("model_version", "created_at")
+    list_display = ("id", "user", "doc_type", "model_version", "created_at", "updated_at")
+    list_filter = ("doc_type", "model_version", "created_at")
     search_fields = ("user__email", "raw_text", "report")
     readonly_fields = ("id", "created_at", "updated_at")

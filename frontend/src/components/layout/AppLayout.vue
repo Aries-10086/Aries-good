@@ -70,6 +70,9 @@ const activeMenu = computed(() => {
   if (route.path.startsWith("/chat")) {
     return "/chat";
   }
+  if (route.path.startsWith("/documents") || route.path.startsWith("/review")) {
+    return "/documents";
+  }
   return route.path;
 });
 </script>

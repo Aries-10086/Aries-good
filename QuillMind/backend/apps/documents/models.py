@@ -5,6 +5,12 @@ from django.db import models
 
 
 class DocumentReview(models.Model):
+    class DocType(models.TextChoices):
+        CONTRACT = "contract", "合同"
+        REPORT = "report", "报告"
+        TESTIMONY = "testimony", "口供"
+        GENERAL = "general", "通用"
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -13,6 +19,12 @@ class DocumentReview(models.Model):
         db_index=True,
     )
     raw_text = models.TextField()
+    doc_type = models.CharField(
+        max_length=32,
+        choices=DocType.choices,
+        default=DocType.GENERAL,
+        db_index=True,
+    )
     risks = models.JSONField(default=list, blank=True)
     report = models.TextField(blank=True)
     model_version = models.CharField(max_length=100, blank=True)

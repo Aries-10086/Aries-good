@@ -63,6 +63,20 @@ const routes = [
     meta: { title: "文案检索" },
   },
   {
+    path: "/documents/:id",
+    name: "document-review-detail",
+    component: () => import("@/views/DocumentReview/DocumentReviewDetailView.vue"),
+    meta: { title: "分析报告" },
+  },
+  {
+    path: "/review",
+    redirect: "/documents",
+  },
+  {
+    path: "/review/:id",
+    redirect: "/documents/:id",
+  },
+  {
     path: "/settings",
     name: "settings",
     component: () => import("@/views/Settings/SettingsView.vue"),

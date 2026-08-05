@@ -1,7 +1,7 @@
 # 文墨 Wenmo
 
-文墨是一个中文 AI 写作与沟通助手。当前仓库包含风格档案、风格写作工作台，以及
-聊天助手的后端会话与人设能力。
+文墨是一个中文 AI 写作与沟通助手。当前仓库包含风格档案、风格写作工作台、
+聊天助手，以及文案智能检索（文档风险分析）能力。
 
 ## 项目结构
 
@@ -48,6 +48,13 @@ DOCUMENT_REVIEW_SCORE_THRESHOLD=0.5
 
 也可使用 `DOCUMENT_REVIEW_MODEL_ROOT` 和
 `DOCUMENT_REVIEW_MODEL_VERSION` 覆盖模型根目录及默认版本。
+
+## 本地 Redis（Celery）
+
+```bash
+./scripts/dev-up.sh
+redis-cli ping   # 期望 PONG
+```
 
 ## 启动后端
 
@@ -98,5 +105,14 @@ export WENMO_E2E_PASSWORD="一次性测试密码"
 python scripts/style_mvp_e2e.py
 ```
 
-详细操作见[风格写作用户指南](docs/user-guide-style.md)和
-[沟通助手用户指南](docs/user-guide-chat.md)。111111
+文案检索全链路验收：
+
+```bash
+export WENMO_BASE_URL="https://your-dev-host.example.com"
+export WENMO_E2E_PASSWORD="一次性测试密码"
+python scripts/document_review_e2e.py
+```
+
+详细操作见[风格写作用户指南](docs/user-guide-style.md)、
+[沟通助手用户指南](docs/user-guide-chat.md)，以及数据库连接说明
+[docs/database.md](docs/database.md)。
