@@ -9,9 +9,16 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 load_dotenv(BASE_DIR / ".env")
 
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "change-me-in-env")
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "")
+if not SECRET_KEY or SECRET_KEY == "change-me-in-env":
+    raise RuntimeError("DJANGO_SECRET_KEY must be set to a strong secret.")
+
 DEBUG = False
-ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+    if host.strip()
+]
 
 INSTALLED_APPS = [
     "daphne",
@@ -94,7 +101,20 @@ STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "users.User"
 
-CORS_ALLOWED_ORIGINS = ["http://localhost:5173"]
+CORS_ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "CORS_ALLOWED_ORIGINS",
+        "http://localhost:5173",
+    ).split(",")
+    if origin.strip()
+]
+
+ENABLE_API_DOCS = os.getenv("ENABLE_API_DOCS", "false").lower() in (
+    "1",
+    "true",
+    "yes",
+)
 
 REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
@@ -104,6 +124,17 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
     ),
+    "DEFAULT_THROTTLE_CLASSES": (
+        "rest_framework.throttling.AnonRateThrottle",
+        "core.throttling.SafeUserRateThrottle",
+    ),
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": os.getenv("DRF_THROTTLE_ANON", "30/min"),
+        "user": os.getenv("DRF_THROTTLE_USER", "120/min"),
+        "auth": os.getenv("DRF_THROTTLE_AUTH", "10/min"),
+        "generation": os.getenv("DRF_THROTTLE_GENERATION", "20/min"),
+        "document_review": os.getenv("DRF_THROTTLE_DOCUMENT_REVIEW", "10/min"),
+    },
 }
 
 SPECTACULAR_SETTINGS = {
@@ -194,6 +225,12 @@ CHAT_REPLY_BASE_TEMPERATURE = float(
 )
 CHAT_REGENERATE_TEMPERATURE = float(
     os.getenv("CHAT_REGENERATE_TEMPERATURE", "1.0"),
+)
+CHAT_WS_TICKET_TTL_SECONDS = int(os.getenv("CHAT_WS_TICKET_TTL_SECONDS", "60"))
+LLM_RATE_LIMIT_FAIL_OPEN = os.getenv("LLM_RATE_LIMIT_FAIL_OPEN", "false").lower() in (
+    "1",
+    "true",
+    "yes",
 )
 LLM_MODEL_PRICING_USD_PER_1K_TOKENS = {
     # Approximate defaults for logging only; keep billing source of truth external.

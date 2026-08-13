@@ -6,8 +6,6 @@ from channels.db import database_sync_to_async
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.db import close_old_connections
-from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
-from rest_framework_simplejwt.tokens import AccessToken
 
 
 @database_sync_to_async
@@ -19,8 +17,15 @@ def _get_user(user_id):
         return AnonymousUser()
 
 
-class JWTQueryAuthMiddleware:
-    """Authenticate WebSockets using an access token in `?token=`."""
+@database_sync_to_async
+def _consume_ticket(ticket: str):
+    from .ws_tickets import consume_ticket
+
+    return consume_ticket(ticket)
+
+
+class WebSocketTicketAuthMiddleware:
+    """Authenticate WebSockets using a one-time ticket from REST `ws-ticket`."""
 
     def __init__(self, app):
         self.app = app
@@ -28,14 +33,13 @@ class JWTQueryAuthMiddleware:
     async def __call__(self, scope, receive, send):
         close_old_connections()
         query = parse_qs(scope.get("query_string", b"").decode("utf-8"))
-        token_value = query.get("token", [""])[0]
+        ticket_value = query.get("ticket", [""])[0]
         user = AnonymousUser()
 
-        if token_value:
-            try:
-                token = AccessToken(token_value)
-                user = await _get_user(token["user_id"])
-            except (InvalidToken, TokenError, KeyError, ValueError):
-                pass
+        if ticket_value:
+            payload = await _consume_ticket(ticket_value)
+            if payload is not None:
+                user_id, _session_id = payload
+                user = await _get_user(user_id)
 
         return await self.app({**scope, "user": user}, receive, send)

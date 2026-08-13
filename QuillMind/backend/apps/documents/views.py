@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.tasks.models import AsyncTask
+from core.throttling import DocumentReviewRateThrottle
 from apps.tasks.serializers import AsyncTaskSerializer
 
 from .models import DocumentReview
@@ -33,6 +34,7 @@ class DocumentReviewPagination(PageNumberPagination):
 
 class DocumentReviewCreateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [DocumentReviewRateThrottle]
     serializer_class = DocumentReviewCreateSerializer
 
     @extend_schema(

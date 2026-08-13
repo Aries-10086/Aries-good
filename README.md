@@ -70,10 +70,11 @@ python manage.py runserver
 
 API 文档：`http://127.0.0.1:8000/api/docs/`
 
-聊天流使用 WebSocket：
+聊天流使用 WebSocket（先通过 REST 换取一次性 ticket，避免 JWT 出现在 URL 中）：
 
 ```text
-ws://127.0.0.1:8000/ws/chat/{session_id}/?token={JWT_ACCESS_TOKEN}
+POST /api/v1/chat/sessions/{session_id}/ws-ticket
+ws://127.0.0.1:8000/ws/chat/{session_id}/?ticket={WS_TICKET}
 ```
 
 发送 `{"action":"message","content":"对方说的话"}` 获取 token 流；发送

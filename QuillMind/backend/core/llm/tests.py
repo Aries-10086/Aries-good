@@ -115,3 +115,20 @@ class LLMGatewayTests(SimpleTestCase):
         )
 
         self.assertEqual("".join(gateway.stream("ping")), "pong")
+
+
+class RedisRateLimiterTests(SimpleTestCase):
+    @override_settings(LLM_RATE_LIMIT_FAIL_OPEN=False, REDIS_URL="redis://127.0.0.1:6399/0")
+    def test_fail_closed_when_redis_unavailable(self):
+        from unittest.mock import MagicMock, patch
+
+        import redis
+
+        from .rate_limit import RedisRateLimiter
+
+        client = MagicMock()
+        client.incr.side_effect = redis.RedisError("down")
+        with patch("core.llm.rate_limit.redis.Redis.from_url", return_value=client):
+            limiter = RedisRateLimiter(limit=5)
+            with self.assertRaises(LLMRateLimitError):
+                limiter.check("user-1")

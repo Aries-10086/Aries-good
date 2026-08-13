@@ -1,12 +1,11 @@
 import { onScopeDispose, ref } from "vue";
 
+import { createChatWebSocketTicket } from "@/api/chat";
 import { useChatStore } from "@/stores/chat";
-import { useUserStore } from "@/stores/user";
 import type { ChatSocketEvent } from "@/types";
 
 export function useChat(sessionId: string) {
   const chatStore = useChatStore();
-  const userStore = useUserStore();
   const connected = ref(false);
   const connecting = ref(false);
   const generating = ref(false);
@@ -23,8 +22,24 @@ export function useChat(sessionId: string) {
 
     connecting.value = true;
     error.value = "";
-    connectionPromise = new Promise<void>((resolve, reject) => {
-      socket = new WebSocket(websocketUrl(sessionId, userStore.accessToken));
+    connectionPromise = (async () => {
+      const { ticket } = await createChatWebSocketTicket(sessionId);
+      await openSocket(ticket);
+    })().catch((reason: unknown) => {
+      const message =
+        reason instanceof Error ? reason.message : "无法连接实时对话服务";
+      error.value = message;
+      connecting.value = false;
+      connectionPromise = null;
+      throw reason instanceof Error ? reason : new Error(message);
+    });
+
+    return connectionPromise;
+  }
+
+  function openSocket(ticket: string) {
+    return new Promise<void>((resolve, reject) => {
+      socket = new WebSocket(websocketUrl(sessionId, ticket));
       socket.onopen = () => {
         connected.value = true;
         connecting.value = false;
@@ -52,7 +67,6 @@ export function useChat(sessionId: string) {
         }
       };
     });
-    return connectionPromise;
   }
 
   async function sendCounterpartMessage(content: string) {
@@ -143,10 +157,10 @@ export function useChat(sessionId: string) {
   };
 }
 
-function websocketUrl(sessionId: string, accessToken: string) {
+function websocketUrl(sessionId: string, ticket: string) {
   const configuredBase = import.meta.env.VITE_WS_BASE_URL?.replace(/\/$/, "");
   const base =
     configuredBase ||
     `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}`;
-  return `${base}/ws/chat/${sessionId}/?token=${encodeURIComponent(accessToken)}`;
+  return `${base}/ws/chat/${sessionId}/?ticket=${encodeURIComponent(ticket)}`;
 }

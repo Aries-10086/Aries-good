@@ -52,6 +52,11 @@ class ChatSuggestionResponseSerializer(serializers.Serializer):
     regenerate = serializers.BooleanField()
 
 
+class ChatWebSocketTicketSerializer(serializers.Serializer):
+    ticket = serializers.CharField()
+    expires_in = serializers.IntegerField()
+
+
 class ChatSessionSerializer(serializers.ModelSerializer):
     session_id = serializers.UUIDField(source="id", read_only=True)
     style_profile_id = serializers.UUIDField(

@@ -5,6 +5,7 @@ from .views import (
     ChatSessionDetailView,
     ChatSessionListCreateView,
     ChatSuggestionView,
+    ChatWebSocketTicketView,
 )
 
 
@@ -24,5 +25,10 @@ urlpatterns = [
         "sessions/<uuid:session_id>/suggestions",
         ChatSuggestionView.as_view(),
         name="chat-session-suggestions",
+    ),
+    path(
+        "sessions/<uuid:session_id>/ws-ticket",
+        ChatWebSocketTicketView.as_view(),
+        name="chat-session-ws-ticket",
     ),
 ]

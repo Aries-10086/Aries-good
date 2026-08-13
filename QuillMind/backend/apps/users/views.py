@@ -4,11 +4,14 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
+from core.throttling import AuthRateThrottle
+
 from .serializers import RegisterSerializer, UserMeSerializer
 
 
 class RegisterView(APIView):
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [AuthRateThrottle]
 
     @extend_schema(request=RegisterSerializer, responses={201: UserMeSerializer})
     def post(self, request):
@@ -28,8 +31,10 @@ class MeView(APIView):
 
 class LoginView(TokenObtainPairView):
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [AuthRateThrottle]
 
 
 class RefreshView(TokenRefreshView):
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [AuthRateThrottle]
 

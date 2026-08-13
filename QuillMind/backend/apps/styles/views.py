@@ -14,6 +14,7 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 
 from core.llm import LLMError
+from core.throttling import GenerationRateThrottle
 from core.prompts import PromptEngineError
 from core.style import EmbeddingError
 
@@ -101,6 +102,7 @@ class StyleProfileDetailView(RetrieveUpdateDestroyAPIView):
 
 class StyleGenerateView(GenericAPIView):
     permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [GenerationRateThrottle]
     serializer_class = StyleGenerationRequestSerializer
 
     @extend_schema(

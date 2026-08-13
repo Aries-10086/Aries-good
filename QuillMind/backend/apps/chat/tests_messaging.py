@@ -12,9 +12,8 @@ from django.contrib.auth.models import AnonymousUser
 from django.test import SimpleTestCase, override_settings
 from django.urls import resolve, reverse
 from rest_framework.test import APIRequestFactory, force_authenticate
-from rest_framework_simplejwt.tokens import AccessToken
 
-from .auth import JWTQueryAuthMiddleware
+from .auth import WebSocketTicketAuthMiddleware
 from .consumers import ChatConsumer
 from .messaging import (
     MAX_REPLY_CHARS,
@@ -332,17 +331,19 @@ class ChatMessageRoutingTests(SimpleTestCase):
         self.assertTrue(response.data["regenerate"])
         self.assertEqual(response.data["suggestions"], ["换一个建议"])
 
-    def test_invalid_websocket_token_is_anonymous(self):
+    @patch("apps.chat.auth._consume_ticket", new_callable=AsyncMock)
+    def test_invalid_websocket_ticket_is_anonymous(self, consume_mock):
+        consume_mock.return_value = None
         captured = {}
 
         async def app(scope, receive, send):
             captured["user"] = scope["user"]
 
-        middleware = JWTQueryAuthMiddleware(app)
+        middleware = WebSocketTicketAuthMiddleware(app)
 
         async def run():
             await middleware(
-                {"query_string": b"token=invalid"},
+                {"query_string": b"ticket=invalid"},
                 lambda: None,
                 lambda message: None,
             )
@@ -351,21 +352,26 @@ class ChatMessageRoutingTests(SimpleTestCase):
         self.assertIsInstance(captured["user"], AnonymousUser)
 
     @patch("apps.chat.auth._get_user", new_callable=AsyncMock)
-    def test_valid_websocket_token_sets_authenticated_user(self, get_user_mock):
+    @patch("apps.chat.auth._consume_ticket", new_callable=AsyncMock)
+    def test_valid_websocket_ticket_sets_authenticated_user(
+        self,
+        consume_mock,
+        get_user_mock,
+    ):
         user = SimpleNamespace(id=uuid.uuid4(), is_authenticated=True)
+        session_id = uuid.uuid4()
+        consume_mock.return_value = (str(user.id), str(session_id))
         get_user_mock.return_value = user
-        token = AccessToken()
-        token["user_id"] = str(user.id)
         captured = {}
 
         async def app(scope, receive, send):
             captured["user"] = scope["user"]
 
-        middleware = JWTQueryAuthMiddleware(app)
+        middleware = WebSocketTicketAuthMiddleware(app)
 
         async def run():
             await middleware(
-                {"query_string": f"token={token}".encode()},
+                {"query_string": b"ticket=valid-ticket"},
                 lambda: None,
                 lambda message: None,
             )
@@ -374,13 +380,14 @@ class ChatMessageRoutingTests(SimpleTestCase):
         self.assertIs(captured["user"], user)
         get_user_mock.assert_awaited_once_with(str(user.id))
 
-    def test_websocket_rejects_invalid_jwt(self):
+    @patch("apps.chat.auth._consume_ticket", new_callable=AsyncMock, return_value=None)
+    def test_websocket_rejects_invalid_ticket(self, _consume_mock):
         from config.asgi import application
 
         async def run():
             communicator = WebsocketCommunicator(
                 application,
-                f"/ws/chat/{uuid.uuid4()}/?token=invalid",
+                f"/ws/chat/{uuid.uuid4()}/?ticket=invalid",
                 headers=[
                     (b"host", b"localhost"),
                     (b"origin", b"http://localhost"),
@@ -398,8 +405,10 @@ class ChatMessageRoutingTests(SimpleTestCase):
     @patch.object(ChatConsumer, "_last_message", new_callable=AsyncMock)
     @patch.object(ChatConsumer, "_get_session", new_callable=AsyncMock)
     @patch("apps.chat.auth._get_user", new_callable=AsyncMock)
+    @patch("apps.chat.auth._consume_ticket", new_callable=AsyncMock)
     def test_websocket_pushes_token_stream(
         self,
+        consume_mock,
         get_user_mock,
         get_session_mock,
         last_message_mock,
@@ -410,18 +419,17 @@ class ChatMessageRoutingTests(SimpleTestCase):
         user = SimpleNamespace(id=uuid.uuid4(), is_authenticated=True)
         session = make_session()
         session.user_id = user.id
+        consume_mock.return_value = (str(user.id), str(session.id))
         get_user_mock.return_value = user
         get_session_mock.return_value = session
         last_message = {"role": "assistant", "content": "先休息一下。"}
         last_message_mock.return_value = last_message
         stream_mock.return_value = iter(["先休息", "一下。"])
-        token = AccessToken()
-        token["user_id"] = str(user.id)
 
         async def run():
             communicator = WebsocketCommunicator(
                 application,
-                f"/ws/chat/{session.id}/?token={token}",
+                f"/ws/chat/{session.id}/?ticket=ws-test-ticket",
                 headers=[
                     (b"host", b"localhost"),
                     (b"origin", b"http://localhost"),

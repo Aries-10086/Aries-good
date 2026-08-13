@@ -2,6 +2,7 @@ import { http } from "@/api/http";
 import type {
   ChatSession,
   ChatSuggestionResponse,
+  ChatWebSocketTicket,
   CreateChatSessionPayload,
   PaginatedResponse,
 } from "@/types";
@@ -35,6 +36,13 @@ export async function getChatSuggestions(
   const { data } = await http.post<ChatSuggestionResponse>(
     `/chat/sessions/${sessionId}/suggestions`,
     { regenerate },
+  );
+  return data;
+}
+
+export async function createChatWebSocketTicket(sessionId: string) {
+  const { data } = await http.post<ChatWebSocketTicket>(
+    `/chat/sessions/${sessionId}/ws-ticket`,
   );
   return data;
 }

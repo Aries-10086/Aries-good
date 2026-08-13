@@ -172,6 +172,11 @@ export type ChatSuggestionResponse = {
   regenerate: boolean;
 };
 
+export type ChatWebSocketTicket = {
+  ticket: string;
+  expires_in: number;
+};
+
 export type ChatSocketEvent =
   | {
       event: "start";

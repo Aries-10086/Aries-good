@@ -1,12 +1,15 @@
 from drf_spectacular.utils import extend_schema
+from django.conf import settings
 from django.shortcuts import get_object_or_404
 from rest_framework import permissions, status
 from rest_framework.generics import GenericAPIView, ListCreateAPIView, RetrieveDestroyAPIView
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from core.llm import LLMError
 from core.prompts import PromptEngineError
+from core.throttling import GenerationRateThrottle
 
 from .messaging import ChatMessageService
 from .models import ChatSession
@@ -18,7 +21,9 @@ from .serializers import (
     ChatSessionSerializer,
     ChatSuggestionRequestSerializer,
     ChatSuggestionResponseSerializer,
+    ChatWebSocketTicketSerializer,
 )
+from .ws_tickets import issue_ticket
 
 
 class ChatSessionPagination(PageNumberPagination):
@@ -84,6 +89,7 @@ class OwnedChatSessionMixin:
 
 class ChatMessageView(OwnedChatSessionMixin, GenericAPIView):
     permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [GenerationRateThrottle]
     serializer_class = ChatMessageRequestSerializer
 
     @extend_schema(
@@ -116,6 +122,7 @@ class ChatMessageView(OwnedChatSessionMixin, GenericAPIView):
 
 class ChatSuggestionView(OwnedChatSessionMixin, GenericAPIView):
     permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [GenerationRateThrottle]
     serializer_class = ChatSuggestionRequestSerializer
 
     @extend_schema(
@@ -140,5 +147,20 @@ class ChatSuggestionView(OwnedChatSessionMixin, GenericAPIView):
             {
                 "suggestions": suggestions,
                 "regenerate": regenerate,
+            }
+        )
+
+
+class ChatWebSocketTicketView(OwnedChatSessionMixin, APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(responses={200: ChatWebSocketTicketSerializer})
+    def post(self, request, session_id):
+        session = self.get_session()
+        ticket = issue_ticket(user_id=request.user.id, session_id=session.id)
+        return Response(
+            {
+                "ticket": ticket,
+                "expires_in": settings.CHAT_WS_TICKET_TTL_SECONDS,
             }
         )

@@ -45,8 +45,10 @@ class RedisRateLimiter:
             if count == 1:
                 self.client.expire(key, self.window_seconds)
         except redis.RedisError:
-            logger.warning("LLM rate limiter unavailable; allowing request.", exc_info=True)
-            return
+            logger.warning("LLM rate limiter unavailable.", exc_info=True)
+            if getattr(settings, "LLM_RATE_LIMIT_FAIL_OPEN", False):
+                return
+            raise LLMRateLimitError("LLM rate limiter unavailable.")
 
         if count > self.limit:
             raise LLMRateLimitError("LLM rate limit exceeded for this user.")
