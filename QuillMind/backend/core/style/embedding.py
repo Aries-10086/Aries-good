@@ -83,6 +83,28 @@ def average_vectors(vectors: list[list[float]]) -> list[float]:
     ]
 
 
+def merge_incremental_average(
+    existing_mean: list[float],
+    existing_count: int,
+    new_vectors: list[list[float]],
+) -> list[float]:
+    if existing_count <= 0 or not existing_mean:
+        return average_vectors(new_vectors)
+    if not new_vectors:
+        return list(existing_mean)
+
+    new_count = len(new_vectors)
+    total = existing_count + new_count
+    return [
+        (
+            existing_mean[index] * existing_count
+            + sum(vector[index] for vector in new_vectors)
+        )
+        / total
+        for index in range(len(existing_mean))
+    ]
+
+
 def embed_style_samples(
     samples: list[str],
     *,

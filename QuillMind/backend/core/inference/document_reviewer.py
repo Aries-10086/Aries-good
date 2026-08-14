@@ -373,19 +373,30 @@ class LLMReviewProvider:
     ) -> list[dict[str, Any]]:
         if not text:
             return []
-        prompt = self.prompt_engine.render(
-            "documents/review",
-            version=None,
-            user_id=user_id,
-            document_type=document_type,
-            text=text,
-        )
-        response = self.llm_gateway.complete(
-            prompt,
-            user_id=user_id,
-            temperature=0.1,
-        )
-        return self._parse(response.text, text)
+        risks: list[dict[str, Any]] = []
+        for offset, segment in _iter_llm_review_segments(text):
+            prompt = self.prompt_engine.render(
+                "documents/review",
+                version=None,
+                user_id=user_id,
+                document_type=document_type,
+                text=segment,
+            )
+            response = self.llm_gateway.complete(
+                prompt,
+                user_id=user_id,
+                temperature=0.1,
+            )
+            segment_risks = self._parse(response.text, segment)
+            for risk in segment_risks:
+                risks.append(
+                    {
+                        **risk,
+                        "start": risk["start"] + offset,
+                        "end": risk["end"] + offset,
+                    }
+                )
+        return merge_risks(risks, text_length=len(text))
 
     def _parse(self, raw_text: str, source_text: str) -> list[dict[str, Any]]:
         cleaned = raw_text.strip()
@@ -403,6 +414,34 @@ class LLMReviewProvider:
             (risk for risk in risks if isinstance(risk, dict)),
             text_length=len(source_text),
         )
+
+
+def _iter_llm_review_segments(text: str) -> Iterable[tuple[int, str]]:
+    max_chars = settings.DOCUMENT_REVIEW_LLM_MAX_CHARS
+    chunk_chars = settings.DOCUMENT_REVIEW_LLM_CHUNK_CHARS
+    if max_chars <= 0:
+        max_chars = len(text)
+    if chunk_chars <= 0:
+        chunk_chars = max_chars
+
+    limited = text[:max_chars]
+    if len(limited) <= chunk_chars:
+        yield 0, limited
+        return
+
+    start = 0
+    while start < len(limited):
+        end = min(start + chunk_chars, len(limited))
+        if end < len(limited):
+            break_at = limited.rfind("\n", start, end)
+            if break_at > start:
+                end = break_at + 1
+        segment = limited[start:end]
+        if segment.strip():
+            yield start, segment
+        if end >= len(limited):
+            break
+        start = end
 
 
 class DocumentReviewer:

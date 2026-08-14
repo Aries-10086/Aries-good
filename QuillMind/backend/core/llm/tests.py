@@ -22,10 +22,15 @@ class BlockingRateLimiter:
 
 
 class FakeProvider(BaseLLMProvider):
-    def __init__(self, name: str, *, should_fail: bool = False):
+    def __init__(self, name: str, *, should_fail: bool = False, configured: bool = True):
         self.name = name
         self.should_fail = should_fail
+        self.configured = configured
         self.calls = 0
+        self.last_stream_usage = TokenUsage(prompt_tokens=10, completion_tokens=5, total_tokens=15)
+
+    def is_configured(self) -> bool:
+        return self.configured
 
     def complete(
         self,
@@ -115,6 +120,40 @@ class LLMGatewayTests(SimpleTestCase):
         )
 
         self.assertEqual("".join(gateway.stream("ping")), "pong")
+
+    def test_stream_skips_unconfigured_providers(self):
+        placeholder = FakeProvider("claude", configured=False)
+        backup = FakeProvider("openai")
+        gateway = LLMGateway(
+            {"claude": placeholder, "openai": backup},
+            provider_order=["claude", "openai"],
+            rate_limiter=NoopRateLimiter(),
+        )
+
+        self.assertEqual("".join(gateway.stream("ping")), "pong")
+        self.assertEqual(placeholder.calls, 0)
+        self.assertEqual(backup.calls, 0)
+
+    def test_complete_skips_unconfigured_providers(self):
+        placeholder = FakeProvider("claude", configured=False)
+        backup = FakeProvider("openai")
+        gateway = LLMGateway(
+            {"claude": placeholder, "openai": backup},
+            provider_order=["claude", "openai"],
+            rate_limiter=NoopRateLimiter(),
+        )
+
+        response = gateway.complete("ping")
+
+        self.assertEqual(response.provider, "openai")
+        self.assertEqual(placeholder.calls, 0)
+        self.assertEqual(backup.calls, 1)
+
+    def test_from_settings_excludes_unconfigured_claude(self):
+        with override_settings(OPENAI_API_KEY="", LLM_PROVIDER_ORDER="openai,claude"):
+            gateway = LLMGateway.from_settings()
+            self.assertNotIn("claude", gateway.providers)
+            self.assertEqual(gateway.provider_order, [])
 
 
 class RedisRateLimiterTests(SimpleTestCase):

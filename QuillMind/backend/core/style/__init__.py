@@ -5,6 +5,7 @@ from .embedding import (
     OpenAIEmbeddingProvider,
     average_vectors,
     embed_style_samples,
+    merge_incremental_average,
 )
 from .features import extract_features
 from .pipeline import StyleExtractionResult, extract_style
@@ -23,6 +24,7 @@ __all__ = (
     "embed_style_samples",
     "extract_features",
     "extract_style",
+    "merge_incremental_average",
     "preprocess_samples",
     "preprocess_text",
 )

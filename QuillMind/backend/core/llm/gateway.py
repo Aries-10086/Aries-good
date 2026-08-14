@@ -30,20 +30,26 @@ class LLMGateway:
 
     @classmethod
     def from_settings(cls):
-        providers: dict[str, BaseLLMProvider] = {
-            "openai": OpenAIProvider(),
-            "claude": ClaudeProvider(),
-        }
+        providers: dict[str, BaseLLMProvider] = {}
+        for candidate in (OpenAIProvider(), ClaudeProvider()):
+            if candidate.is_configured():
+                providers[candidate.name] = candidate
+
         provider_order = [
             provider.strip()
             for provider in settings.LLM_PROVIDER_ORDER.split(",")
-            if provider.strip()
+            if provider.strip() in providers
         ]
+        if not provider_order and providers:
+            provider_order = list(providers.keys())
 
         return cls(providers, provider_order=provider_order)
 
     def register(self, provider: BaseLLMProvider):
-        self.providers[provider.name] = provider
+        if provider.is_configured():
+            self.providers[provider.name] = provider
+            if provider.name not in self.provider_order:
+                self.provider_order.append(provider.name)
 
     def complete(
         self,
@@ -61,11 +67,15 @@ class LLMGateway:
         for provider_name in self._provider_names(provider):
             llm_provider = self.providers.get(provider_name)
 
-            if llm_provider is None:
-                errors.append(LLMProviderError(f"Provider {provider_name} is not registered."))
+            if llm_provider is None or not llm_provider.is_configured():
+                if provider:
+                    errors.append(
+                        LLMProviderError(f"Provider {provider_name} is not configured.")
+                    )
                 continue
 
             start = time.perf_counter()
+            model_name = model or getattr(llm_provider, "default_model", provider_name)
 
             try:
                 response = llm_provider.complete(
@@ -110,21 +120,52 @@ class LLMGateway:
         for provider_name in self._provider_names(provider):
             llm_provider = self.providers.get(provider_name)
 
-            if llm_provider is None:
-                errors.append(LLMProviderError(f"Provider {provider_name} is not registered."))
+            if llm_provider is None or not llm_provider.is_configured():
+                if provider:
+                    errors.append(
+                        LLMProviderError(f"Provider {provider_name} is not configured.")
+                    )
                 continue
 
+            start = time.perf_counter()
+            model_name = model or getattr(llm_provider, "default_model", provider_name)
+            chunks: list[str] = []
+
             try:
-                yield from llm_provider.stream(
+                for chunk in llm_provider.stream(
                     prompt,
                     messages=messages,
                     model=model,
                     **kwargs,
+                ):
+                    chunks.append(chunk)
+                    yield chunk
+
+                latency_ms = int((time.perf_counter() - start) * 1000)
+                usage = getattr(llm_provider, "last_stream_usage", None) or TokenUsage()
+                response = self._with_cost(
+                    LLMResponse(
+                        text="".join(chunks),
+                        provider=provider_name,
+                        model=model_name,
+                        usage=usage,
+                    )
                 )
+                self._log_call(response, latency_ms, user_id=user_id, status="success")
                 return
             except Exception as exc:
+                latency_ms = int((time.perf_counter() - start) * 1000)
                 errors.append(exc)
-                logger.warning("LLM stream provider failed", extra={"provider": provider_name})
+                logger.warning(
+                    "LLM stream provider failed",
+                    extra={
+                        "provider": provider_name,
+                        "latency_ms": latency_ms,
+                        "user_id": user_id,
+                        "status": "failed",
+                    },
+                    exc_info=True,
+                )
 
         raise LLMProviderError("All LLM stream providers failed.") from (
             errors[-1] if errors else None

@@ -171,7 +171,11 @@ class StyleProfileWriteSerializer(serializers.ModelSerializer):
         update_fields = ["name", "updated_at"]
         if new_samples is not None:
             combined_samples = [*instance.samples, *new_samples]
-            result = self._extract(combined_samples)
+            result = self._extract(
+                combined_samples,
+                existing_vector=instance.style_vector,
+                existing_sample_count=len(instance.samples),
+            )
             instance.samples = combined_samples
             instance.style_vector = result["vector"]
             instance.features = result["features"]
@@ -181,8 +185,12 @@ class StyleProfileWriteSerializer(serializers.ModelSerializer):
         instance.save(update_fields=update_fields)
         return instance
 
-    def _extract(self, samples):
+    def _extract(self, samples, *, existing_vector=None, existing_sample_count=0):
         try:
-            return extract_profile_data(samples)
+            return extract_profile_data(
+                samples,
+                existing_vector=existing_vector,
+                existing_sample_count=existing_sample_count,
+            )
         except EmbeddingError as exc:
             raise StyleExtractionUnavailable() from exc

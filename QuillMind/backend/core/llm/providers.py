@@ -13,6 +13,9 @@ from .types import LLMMessage, LLMResponse, TokenUsage
 class BaseLLMProvider(ABC):
     name: str
 
+    def is_configured(self) -> bool:
+        return True
+
     @abstractmethod
     def complete(
         self,
@@ -43,6 +46,10 @@ class OpenAIProvider(BaseLLMProvider):
         self.api_key = api_key or settings.OPENAI_API_KEY
         self.default_model = default_model or settings.LLM_OPENAI_MODEL
         self._client = None
+        self.last_stream_usage = TokenUsage()
+
+    def is_configured(self) -> bool:
+        return bool(self.api_key)
 
     @property
     def client(self):
@@ -92,14 +99,20 @@ class OpenAIProvider(BaseLLMProvider):
         model: str | None = None,
         **kwargs: Any,
     ) -> Iterator[str]:
+        self.last_stream_usage = TokenUsage()
         stream = self.client.chat.completions.create(
             model=model or self.default_model,
             messages=self._messages(prompt, messages),
             stream=True,
+            stream_options={"include_usage": True},
             **kwargs,
         )
 
         for chunk in stream:
+            if getattr(chunk, "usage", None) is not None:
+                self.last_stream_usage = self._usage(chunk)
+            if not chunk.choices:
+                continue
             token = chunk.choices[0].delta.content
             if token:
                 yield token
@@ -131,6 +144,9 @@ class OpenAIProvider(BaseLLMProvider):
 
 class ClaudeProvider(BaseLLMProvider):
     name = "claude"
+
+    def is_configured(self) -> bool:
+        return False
 
     def complete(
         self,

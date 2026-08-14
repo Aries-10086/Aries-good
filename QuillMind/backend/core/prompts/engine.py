@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import time
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -13,6 +15,12 @@ from .exceptions import PromptRenderError, PromptTemplateNotFound
 
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class _CacheEntry:
+    value: Any
+    expires_at: float
 
 
 class PromptEngine:
@@ -29,6 +37,8 @@ class PromptEngine:
             lstrip_blocks=True,
             keep_trailing_newline=True,
         )
+        self._cache: dict[tuple[str, ...], _CacheEntry] = {}
+        self._cache_ttl_seconds = settings.PROMPT_TEMPLATE_CACHE_TTL_SECONDS
 
     def render(
         self,
@@ -84,6 +94,11 @@ class PromptEngine:
         )
 
     def _get_db_content(self, module: str, version: str) -> str | None:
+        cache_key = ("db_content", module, version)
+        cached = self._cache_get(cache_key)
+        if cached is not _CACHE_MISS:
+            return cached
+
         model = self._get_model()
 
         if model is None:
@@ -103,16 +118,23 @@ class PromptEngine:
             logger.warning("Prompt DB lookup failed; falling back to files.", exc_info=True)
             return None
 
-        return template.content if template else None
+        content = template.content if template else None
+        self._cache_set(cache_key, content)
+        return content
 
     def _get_active_versions(self, module: str) -> list[str]:
+        cache_key = ("active_versions", module)
+        cached = self._cache_get(cache_key)
+        if cached is not _CACHE_MISS:
+            return cached
+
         model = self._get_model()
 
         if model is None:
             return []
 
         try:
-            return list(
+            versions = list(
                 model.objects.filter(module=module, is_active=True)
                 .order_by("version")
                 .values_list("version", flat=True)
@@ -120,6 +142,26 @@ class PromptEngine:
         except DatabaseError:
             logger.warning("Prompt version lookup failed; using file default.", exc_info=True)
             return []
+
+        self._cache_set(cache_key, versions)
+        return versions
+
+    def _cache_get(self, key: tuple[str, ...]):
+        entry = self._cache.get(key)
+        if entry is None:
+            return _CACHE_MISS
+        if entry.expires_at <= time.monotonic():
+            del self._cache[key]
+            return _CACHE_MISS
+        return entry.value
+
+    def _cache_set(self, key: tuple[str, ...], value: Any):
+        if self._cache_ttl_seconds <= 0:
+            return
+        self._cache[key] = _CacheEntry(
+            value=value,
+            expires_at=time.monotonic() + self._cache_ttl_seconds,
+        )
 
     def _get_model(self):
         if self.model_class is not None:
@@ -144,3 +186,6 @@ class PromptEngine:
     def _user_bucket(self, user_id: str | int) -> int:
         digest = hashlib.sha256(str(user_id).encode("utf-8")).digest()
         return int.from_bytes(digest[:8], "big") % 100
+
+
+_CACHE_MISS = object()

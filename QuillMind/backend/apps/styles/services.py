@@ -43,8 +43,17 @@ def prepare_samples(
     return cleaned_samples
 
 
-def extract_profile_data(samples: list[str]):
-    return extract_style(samples)
+def extract_profile_data(
+    samples: list[str],
+    *,
+    existing_vector: list[float] | None = None,
+    existing_sample_count: int = 0,
+):
+    return extract_style(
+        samples,
+        existing_vector=existing_vector,
+        existing_sample_count=existing_sample_count,
+    )
 
 
 def _read_uploaded_file(uploaded_file: UploadedFile) -> str:

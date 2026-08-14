@@ -87,14 +87,12 @@ class StyleGenerationService:
                 attempt_number=attempt_number,
                 previous_attempt=attempts[-1] if attempts else None,
             )
-            text = "".join(
-                self.llm_gateway.stream(
-                    prompt,
-                    user_id=user.id,
-                    temperature=temperature,
-                    timeout=self._remaining(deadline),
-                )
-            ).strip()
+            text = self.llm_gateway.complete(
+                prompt,
+                user_id=user.id,
+                temperature=temperature,
+                timeout=self._remaining(deadline),
+            ).text.strip()
             self._remaining(deadline)
             attempt = self._evaluate_attempt(
                 number=attempt_number,

@@ -6,7 +6,7 @@ from types import SimpleNamespace
 from tempfile import TemporaryDirectory
 import time
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, override_settings
 
 from .document_reviewer import (
     DocumentReviewer,
@@ -74,9 +74,11 @@ class FakeSession:
 class FakePromptEngine:
     def __init__(self):
         self.context = None
+        self.contexts: list[dict] = []
 
     def render(self, module, **context):
         self.context = {"module": module, **context}
+        self.contexts.append(self.context)
         return "review prompt"
 
 
@@ -228,6 +230,26 @@ class LLMReviewProviderTests(SimpleTestCase):
         self.assertEqual(prompt_engine.context["module"], "documents/review")
         self.assertEqual(prompt_engine.context["document_type"], "合同")
         self.assertEqual(gateway.calls[0]["temperature"], 0.1)
+
+    @override_settings(
+        DOCUMENT_REVIEW_LLM_MAX_CHARS=6,
+        DOCUMENT_REVIEW_LLM_CHUNK_CHARS=2,
+    )
+    def test_llm_fallback_reviews_long_text_in_segments(self):
+        prompt_engine = FakePromptEngine()
+        gateway = FakeGateway(json.dumps({"risks": []}))
+        provider = LLMReviewProvider(
+            llm_gateway=gateway,
+            prompt_engine=prompt_engine,
+        )
+
+        provider.review("一二三四五六", user_id="user-1", document_type="合同")
+
+        self.assertEqual(len(gateway.calls), 3)
+        self.assertEqual(
+            [context["text"] for context in prompt_engine.contexts],
+            ["一二", "三四", "五六"],
+        )
 
     def test_document_reviewer_falls_back_when_model_is_unavailable(self):
         class MissingONNX:

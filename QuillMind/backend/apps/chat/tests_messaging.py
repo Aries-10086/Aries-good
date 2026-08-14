@@ -58,14 +58,23 @@ class FakePromptEngine:
 
 
 class FakeStreamGateway:
-    def __init__(self, outputs):
+    def __init__(self, outputs, *, complete_outputs=None):
         self.outputs = list(outputs)
+        self.complete_outputs = list(complete_outputs or [])
         self.calls = []
 
     def stream(self, prompt, **kwargs):
         self.calls.append({"prompt": prompt, **kwargs})
         output = self.outputs[min(len(self.calls) - 1, len(self.outputs) - 1)]
         yield from output
+
+    def complete(self, prompt, **kwargs):
+        self.calls.append({"prompt": prompt, **kwargs})
+        if self.complete_outputs:
+            text = self.complete_outputs[min(len(self.calls) - 1, len(self.complete_outputs) - 1)]
+        else:
+            text = "".join(self.outputs[0]) if self.outputs else ""
+        return SimpleNamespace(text=text)
 
 
 def make_session(*, scene=ChatSession.Scene.CUSTOM):
@@ -150,7 +159,11 @@ class ChatMessageServiceTests(SimpleTestCase):
         session = make_session()
         session.messages = [{"role": "counterpart", "content": "我有点烦"}]
         gateway = FakeStreamGateway(
-            [["建议一"], ["建议二"], ["建议三"], ["换一个建议"]]
+            [],
+            complete_outputs=[
+                json.dumps(["建议一", "建议二", "建议三"], ensure_ascii=False),
+                json.dumps(["换一个建议"], ensure_ascii=False),
+            ],
         )
         service = ChatMessageService(
             llm_gateway=gateway,
@@ -162,6 +175,7 @@ class ChatMessageServiceTests(SimpleTestCase):
 
         self.assertEqual(suggestions, ["建议一", "建议二", "建议三"])
         self.assertEqual(swapped, ["换一个建议"])
+        self.assertEqual(len(gateway.calls), 2)
         self.assertEqual(gateway.calls[-1]["temperature"], 1.05)
 
     def test_twenty_rounds_keep_the_same_persona(self):

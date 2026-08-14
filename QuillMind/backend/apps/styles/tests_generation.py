@@ -32,6 +32,11 @@ class FakeGateway:
         self.calls.append({"prompt": prompt, **kwargs})
         yield from self.outputs[len(self.calls) - 1]
 
+    def complete(self, prompt, **kwargs):
+        self.calls.append({"prompt": prompt, **kwargs})
+        chunks = self.outputs[len(self.calls) - 1]
+        return SimpleNamespace(text="".join(chunks))
+
 
 class FakeEmbeddingProvider:
     def __init__(self, vectors):

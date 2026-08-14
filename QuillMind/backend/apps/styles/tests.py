@@ -128,6 +128,10 @@ class StyleProfileSerializerTests(SimpleTestCase):
         self.assertEqual(len(result.samples), 4)
         self.assertEqual(result.style_vector, EXTRACTION_RESULT["vector"])
         extract_mock.assert_called_once()
+        self.assertEqual(
+            extract_mock.call_args.kwargs["existing_sample_count"],
+            3,
+        )
         save_mock.assert_called_once()
 
 

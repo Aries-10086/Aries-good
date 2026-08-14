@@ -117,6 +117,60 @@ class PromptEngineTests(SimpleTestCase):
         self.assertEqual(first, second)
         self.assertIn(first, {"v1.0.0", "v1.1.0"})
 
+    def test_db_template_lookup_uses_process_cache(self):
+        record = SimpleNamespace(
+            module="styles/generate",
+            version="v1.0.0",
+            content="DB：{{ task }}",
+            is_active=True,
+        )
+        manager = fake_model(record)
+        manager.objects.filter_calls = 0
+        original_filter = manager.objects.filter
+
+        def counting_filter(**filters):
+            manager.objects.filter_calls += 1
+            return original_filter(**filters)
+
+        manager.objects.filter = counting_filter
+        engine = PromptEngine(self.template_dir, model_class=manager)
+
+        engine.render("styles/generate", "v1.0.0", task="第一次")
+        engine.render("styles/generate", "v1.0.0", task="第二次")
+
+        self.assertEqual(manager.objects.filter_calls, 1)
+
+    def test_active_version_lookup_uses_process_cache(self):
+        records = [
+            SimpleNamespace(
+                module="styles/generate",
+                version="v1.0.0",
+                content="A",
+                is_active=True,
+            ),
+            SimpleNamespace(
+                module="styles/generate",
+                version="v1.1.0",
+                content="B",
+                is_active=True,
+            ),
+        ]
+        manager = fake_model(*records)
+        manager.objects.filter_calls = 0
+        original_filter = manager.objects.filter
+
+        def counting_filter(**filters):
+            manager.objects.filter_calls += 1
+            return original_filter(**filters)
+
+        manager.objects.filter = counting_filter
+        engine = PromptEngine(self.template_dir, model_class=manager)
+
+        engine.select_version("styles/generate", user_id="user-1")
+        engine.select_version("styles/generate", user_id="user-1")
+
+        self.assertEqual(manager.objects.filter_calls, 1)
+
 
 class PromptV1TemplateTests(SimpleTestCase):
     def setUp(self):

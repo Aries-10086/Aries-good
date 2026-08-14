@@ -63,6 +63,10 @@ SUGGESTION_STRATEGIES = (
     "表达直接但不生硬，给对方一个容易回答的选择。",
     "语气轻松自然，用简短口语降低沟通压力。",
 )
+SUGGESTIONS_JSON_INSTRUCTION = (
+    "请一次性给出 {count} 条不同策略的回复建议，"
+    "严格以 JSON 数组输出，每项为字符串，不要 markdown 或其它说明。"
+)
 
 
 @dataclass(frozen=True)
@@ -181,29 +185,50 @@ class ChatMessageService:
         strategies = SUGGESTION_STRATEGIES if not regenerate else (
             "换一种之前没有用过的切入方式，措辞更灵活自然。",
         )
-        suggestions: list[str] = []
-
-        for index, strategy in enumerate(strategies):
-            prompt = self._render_reply_prompt(
-                session=session,
-                messages=context,
-                emotion=emotion,
-                strategy_instruction=strategy,
-            )
-            text = "".join(
-                self.llm_gateway.stream(
-                    prompt,
-                    user_id=session.user_id,
-                    temperature=(0.75 + index * 0.1) if not regenerate else 1.05,
-                )
-            )
-            suggestion = truncate_reply(text)
-            if suggestion:
-                suggestions.append(suggestion)
+        strategy_block = "\n".join(
+            f"{index + 1}. {strategy}"
+            for index, strategy in enumerate(strategies)
+        )
+        prompt = self._render_reply_prompt(
+            session=session,
+            messages=context,
+            emotion=emotion,
+            strategy_instruction=(
+                f"{SUGGESTIONS_JSON_INSTRUCTION.format(count=len(strategies))}\n"
+                f"策略要求：\n{strategy_block}"
+            ),
+        )
+        temperature = 0.85 if not regenerate else 1.05
+        response = self.llm_gateway.complete(
+            prompt,
+            user_id=session.user_id,
+            temperature=temperature,
+        )
+        suggestions = [
+            truncate_reply(item)
+            for item in self._parse_suggestions_json(response.text, len(strategies))
+        ]
+        suggestions = [item for item in suggestions if item]
 
         if len(suggestions) != len(strategies):
             raise ValueError("模型未返回足够的回复建议。")
         return suggestions
+
+    def _parse_suggestions_json(self, raw_text: str, expected: int) -> list[str]:
+        cleaned = raw_text.strip()
+        if cleaned.startswith("```"):
+            lines = cleaned.splitlines()
+            cleaned = "\n".join(lines[1:-1]).strip()
+        try:
+            payload = json.loads(cleaned)
+        except (TypeError, json.JSONDecodeError) as exc:
+            raise ValueError("模型未返回有效的回复建议。") from exc
+        if not isinstance(payload, list):
+            raise ValueError("模型未返回有效的回复建议。")
+        suggestions = [str(item).strip() for item in payload if str(item).strip()]
+        if len(suggestions) < expected:
+            raise ValueError("模型未返回足够的回复建议。")
+        return suggestions[:expected]
 
     def _render_reply_prompt(
         self,
