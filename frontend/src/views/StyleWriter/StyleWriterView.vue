@@ -252,7 +252,7 @@
 <script setup lang="ts">
 import { ElMessage } from "element-plus";
 import { storeToRefs } from "pinia";
-import { computed, onMounted, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 import {
@@ -271,9 +271,9 @@ const route = useRoute();
 const router = useRouter();
 const stylesStore = useStylesStore();
 const { currentProfile, loading } = storeToRefs(stylesStore);
-const profileId = String(route.params.id);
+const profileId = computed(() => String(route.params.id));
 const profile = computed(() =>
-  currentProfile.value?.profile_id === profileId ? currentProfile.value : null,
+  currentProfile.value?.profile_id === profileId.value ? currentProfile.value : null,
 );
 
 const topic = ref("");
@@ -319,13 +319,25 @@ const resultMeta = computed(() => {
   return "等待开始";
 });
 
-onMounted(async () => {
-  await Promise.allSettled([loadProfile(), loadHistory()]);
-});
+watch(
+  profileId,
+  () => {
+    topic.value = "";
+    outline.value = "";
+    keywordText.value = "";
+    toneSlider.value = 50;
+    history.value = [];
+    expandedHistory.value = [];
+    currentFeedback.value = "";
+    cancel();
+    void Promise.allSettled([loadProfile(), loadHistory()]);
+  },
+  { immediate: true },
+);
 
 async function loadProfile() {
   try {
-    await stylesStore.fetchProfile(profileId);
+    await stylesStore.fetchProfile(profileId.value);
   } catch {
     ElMessage.error("风格档案加载失败");
   }
@@ -334,7 +346,7 @@ async function loadProfile() {
 async function loadHistory() {
   historyLoading.value = true;
   try {
-    const response = await listGenerationHistory(profileId);
+    const response = await listGenerationHistory(profileId.value);
     history.value = response.results;
   } catch {
     ElMessage.error("历史记录加载失败");
@@ -347,7 +359,7 @@ async function startGeneration() {
   if (!topic.value.trim() || generating.value) return;
   currentFeedback.value = "";
   const payload: StyleGenerationPayload = {
-    profile_id: profileId,
+    profile_id: profileId.value,
     topic: topic.value.trim(),
     outline: outline.value.trim(),
     keywords: keywords.value,

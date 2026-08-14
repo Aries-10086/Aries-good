@@ -60,7 +60,11 @@ async function submit() {
     return;
   }
 
-  await register(form);
+  try {
+    await register(form);
+  } catch {
+    // useAuth 已展示错误提示
+  }
 }
 </script>
 

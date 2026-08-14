@@ -4,12 +4,17 @@ import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 
 import * as authApi from "@/api/auth";
+import { useChatStore } from "@/stores/chat";
+import { useStylesStore } from "@/stores/styles";
 import { useUserStore } from "@/stores/user";
 import type { LoginPayload, RegisterPayload } from "@/types";
+import { formatApiError } from "@/utils/apiError";
 
 export function useAuth() {
   const router = useRouter();
   const userStore = useUserStore();
+  const chatStore = useChatStore();
+  const stylesStore = useStylesStore();
   const { userInfo, isAuthenticated } = storeToRefs(userStore);
   const loading = ref(false);
   const displayName = computed(() => {
@@ -33,6 +38,9 @@ export function useAuth() {
       userStore.setUserInfo(currentUser);
       ElMessage.success("登录成功");
       await router.push(redirect);
+    } catch (error) {
+      ElMessage.error(formatApiError(error, "登录失败，请稍后重试"));
+      throw error;
     } finally {
       loading.value = false;
     }
@@ -45,6 +53,9 @@ export function useAuth() {
       await authApi.register(payload);
       ElMessage.success("注册成功，请登录");
       await router.push({ name: "login", query: { email: payload.email } });
+    } catch (error) {
+      ElMessage.error(formatApiError(error, "注册失败，请稍后重试"));
+      throw error;
     } finally {
       loading.value = false;
     }
@@ -61,6 +72,8 @@ export function useAuth() {
   }
 
   async function logout() {
+    chatStore.$reset();
+    stylesStore.$reset();
     userStore.logout();
     await router.push({ name: "login" });
   }

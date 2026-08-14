@@ -187,7 +187,7 @@
 <script setup lang="ts">
 import { ElMessage } from "element-plus";
 import { storeToRefs } from "pinia";
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 import { useChat } from "@/composables/useChat";
@@ -203,11 +203,11 @@ const {
   suggestions,
   suggestionsLoading,
 } = storeToRefs(chatStore);
-const sessionId = String(route.params.id);
+const sessionId = computed(() => String(route.params.id));
 const counterpartInput = ref("");
 const messagesContainer = ref<HTMLElement | null>(null);
 const session = computed(() =>
-  currentSession.value?.session_id === sessionId ? currentSession.value : null,
+  currentSession.value?.session_id === sessionId.value ? currentSession.value : null,
 );
 const scene = computed(
   () =>
@@ -234,16 +234,21 @@ const {
   regenerate,
 } = useChat(sessionId);
 
-onMounted(async () => {
-  chatStore.clearSuggestions();
-  try {
-    await chatStore.fetchSession(sessionId);
-    await connect();
-    await scrollToBottom();
-  } catch {
-    if (!session.value) ElMessage.error("会话加载失败");
-  }
-});
+watch(
+  sessionId,
+  async () => {
+    chatStore.clearSuggestions();
+    counterpartInput.value = "";
+    try {
+      await chatStore.fetchSession(sessionId.value);
+      await connect();
+      await scrollToBottom();
+    } catch {
+      if (!session.value) ElMessage.error("会话加载失败");
+    }
+  },
+  { immediate: true },
+);
 
 watch(
   () => [session.value?.messages.length, streamingText.value],
@@ -272,7 +277,7 @@ async function regenerateReply() {
 
 async function generateSuggestions() {
   try {
-    await chatStore.fetchSuggestions(sessionId);
+    await chatStore.fetchSuggestions(sessionId.value);
     await nextTick();
     scrollToBottom();
   } catch {

@@ -54,7 +54,11 @@ async function submit() {
     return;
   }
 
-  await login(form, String(route.query.redirect ?? "/"));
+  try {
+    await login(form, String(route.query.redirect ?? "/"));
+  } catch {
+    // useAuth 已展示错误提示
+  }
 }
 </script>
 

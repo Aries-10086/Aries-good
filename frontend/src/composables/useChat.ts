@@ -1,10 +1,18 @@
-import { onScopeDispose, ref } from "vue";
+import {
+  computed,
+  onScopeDispose,
+  ref,
+  toValue,
+  watch,
+  type MaybeRefOrGetter,
+} from "vue";
 
 import { createChatWebSocketTicket } from "@/api/chat";
 import { useChatStore } from "@/stores/chat";
 import type { ChatSocketEvent } from "@/types";
 
-export function useChat(sessionId: string) {
+export function useChat(sessionIdSource: MaybeRefOrGetter<string>) {
+  const sessionId = computed(() => toValue(sessionIdSource));
   const chatStore = useChatStore();
   const connected = ref(false);
   const connecting = ref(false);
@@ -16,15 +24,27 @@ export function useChat(sessionId: string) {
   let connectionPromise: Promise<void> | null = null;
   let pendingRegenerate = false;
 
+  watch(sessionId, (next, prev) => {
+    if (prev && next !== prev) {
+      disconnect();
+    }
+  });
+
   async function connect() {
-    if (socket?.readyState === WebSocket.OPEN) return;
-    if (connectionPromise) return connectionPromise;
+    if (connectionPromise) {
+      return connectionPromise;
+    }
+
+    if (socket?.readyState === WebSocket.OPEN) {
+      return;
+    }
 
     connecting.value = true;
     error.value = "";
+    const activeSessionId = sessionId.value;
     connectionPromise = (async () => {
-      const { ticket } = await createChatWebSocketTicket(sessionId);
-      await openSocket(ticket);
+      const { ticket } = await createChatWebSocketTicket(activeSessionId);
+      await openSocket(activeSessionId, ticket);
     })().catch((reason: unknown) => {
       const message =
         reason instanceof Error ? reason.message : "无法连接实时对话服务";
@@ -37,9 +57,9 @@ export function useChat(sessionId: string) {
     return connectionPromise;
   }
 
-  function openSocket(ticket: string) {
+  function openSocket(activeSessionId: string, ticket: string) {
     return new Promise<void>((resolve, reject) => {
-      socket = new WebSocket(websocketUrl(sessionId, ticket));
+      socket = new WebSocket(websocketUrl(activeSessionId, ticket));
       socket.onopen = () => {
         connected.value = true;
         connecting.value = false;
@@ -139,6 +159,8 @@ export function useChat(sessionId: string) {
     connected.value = false;
     connecting.value = false;
     generating.value = false;
+    streamingText.value = "";
+    pendingRegenerate = false;
   }
 
   onScopeDispose(disconnect);

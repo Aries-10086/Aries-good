@@ -236,7 +236,7 @@ import {
   type UploadUserFile,
 } from "element-plus";
 import { storeToRefs } from "pinia";
-import { computed, onMounted, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 import { useStylesStore } from "@/stores/styles";
@@ -246,9 +246,9 @@ const router = useRouter();
 const stylesStore = useStylesStore();
 const { currentProfile, loading } = storeToRefs(stylesStore);
 
-const profileId = String(route.params.id);
+const profileId = computed(() => String(route.params.id));
 const profile = computed(() =>
-  currentProfile.value?.profile_id === profileId ? currentProfile.value : null,
+  currentProfile.value?.profile_id === profileId.value ? currentProfile.value : null,
 );
 const expandedSamples = ref<string[]>([]);
 const appendVisible = ref(false);
@@ -308,13 +308,19 @@ const punctuation = computed(
     },
 );
 
-onMounted(async () => {
-  try {
-    await stylesStore.fetchProfile(profileId);
-  } catch {
-    ElMessage.error("风格档案加载失败");
-  }
-});
+watch(
+  profileId,
+  async () => {
+    expandedSamples.value = [];
+    appendVisible.value = false;
+    try {
+      await stylesStore.fetchProfile(profileId.value);
+    } catch {
+      ElMessage.error("风格档案加载失败");
+    }
+  },
+  { immediate: true },
+);
 
 async function editName() {
   if (!profile.value) return;
@@ -329,7 +335,7 @@ async function editName() {
     });
     const name = value.trim();
     if (name === profile.value.name) return;
-    await stylesStore.updateProfile(profileId, { name });
+    await stylesStore.updateProfile(profileId.value, { name });
     ElMessage.success("档案名称已更新");
   } catch (error) {
     if (error !== "cancel" && error !== "close") {
@@ -353,7 +359,7 @@ async function appendSamples() {
 
   appending.value = true;
   try {
-    await stylesStore.updateProfile(profileId, { samples, files });
+    await stylesStore.updateProfile(profileId.value, { samples, files });
     appendVisible.value = false;
     ElMessage.success("样本已追加，风格特征已重新分析");
   } catch {
@@ -376,7 +382,7 @@ async function removeProfile() {
       },
     );
     deleting.value = true;
-    await stylesStore.deleteProfile(profileId);
+    await stylesStore.deleteProfile(profileId.value);
     ElMessage.success("风格档案已删除");
     await router.replace("/style");
   } catch (error) {
