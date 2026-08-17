@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import nullcontext
 from types import SimpleNamespace
 from unittest.mock import patch
 import uuid
@@ -11,6 +12,7 @@ from rest_framework.test import APIRequestFactory, force_authenticate
 from apps.tasks.models import AsyncTask
 
 from .models import DocumentReview
+from .serializers import build_text_preview
 from .services import DocumentReviewService, enrich_risks, normalize_review_text
 from .views import DocumentReviewCreateView, DocumentReviewTaskStatusView
 
@@ -40,6 +42,12 @@ class DocumentReviewServiceTests(SimpleTestCase):
             normalize_review_text("   ")
         with self.assertRaises(ValueError):
             normalize_review_text("文" * 20_001)
+
+    def test_build_text_preview_truncates_long_text(self):
+        preview = build_text_preview("这是一段" * 100)
+
+        self.assertLessEqual(len(preview), 241)
+        self.assertTrue(preview.endswith("…"))
 
     @patch("apps.documents.services.generate_with_deai_retry")
     def test_review_persists_risks_and_report(self, retry_mock):
@@ -89,8 +97,15 @@ class DocumentReviewViewTests(SimpleTestCase):
         self.factory = APIRequestFactory()
         self.user = SimpleNamespace(id=uuid.uuid4(), is_authenticated=True)
 
+    @patch("apps.documents.views.transaction.atomic", return_value=nullcontext())
     @patch("apps.documents.views.review_document_task")
-    def test_create_review_returns_task_and_review_ids(self, task_mock):
+    @patch("apps.documents.views.transaction.on_commit", side_effect=lambda callback: callback())
+    def test_create_review_returns_task_and_review_ids(
+        self,
+        _on_commit_mock,
+        task_mock,
+        _atomic_mock,
+    ):
         request = self.factory.post(
             "/api/v1/documents/review",
             {"text": "费用在任何情况下均不退还。", "doc_type": "contract"},
@@ -113,7 +128,7 @@ class DocumentReviewViewTests(SimpleTestCase):
         self.assertEqual(response.data["review_id"], review.id)
         task_mock.apply_async.assert_called_once()
 
-    @patch("apps.documents.views.DocumentReviewDetailSerializer")
+    @patch("apps.documents.views.DocumentReviewResultSerializer")
     @patch("apps.documents.views.DocumentReview.objects.filter")
     @patch("apps.documents.views.AsyncTask.objects.filter")
     def test_task_status_includes_review_when_success(

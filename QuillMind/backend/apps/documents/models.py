@@ -34,6 +34,12 @@ class DocumentReview(models.Model):
     class Meta:
         db_table = "document_reviews"
         ordering = ("-created_at",)
+        indexes = [
+            models.Index(
+                fields=("user", "created_at"),
+                name="docrev_user_created_idx",
+            ),
+        ]
 
     def __str__(self):
         return f"Document review {self.id}"

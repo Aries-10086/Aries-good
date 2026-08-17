@@ -55,6 +55,10 @@ class ChatSession(models.Model):
         ordering = ("-updated_at",)
         indexes = [
             models.Index(fields=("status", "updated_at"), name="chat_status_updated_idx"),
+            models.Index(
+                fields=("user", "updated_at"),
+                name="chat_sessions_user_updated_idx",
+            ),
         ]
 
     def __str__(self):

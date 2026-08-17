@@ -70,6 +70,12 @@ class GenerationRecord(models.Model):
     class Meta:
         db_table = "generation_records"
         ordering = ("-created_at",)
+        indexes = [
+            models.Index(
+                fields=("user", "created_at"),
+                name="genrec_user_created_idx",
+            ),
+        ]
 
     def __str__(self):
         return f"Generation record {self.id}"

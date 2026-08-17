@@ -18,6 +18,10 @@ class PromptTemplate(models.Model):
         ordering = ("module", "-updated_at")
         indexes = [
             models.Index(fields=("module", "is_active"), name="prompt_module_active_idx"),
+            models.Index(
+                fields=("module", "version", "is_active"),
+                name="prompt_mod_ver_active_idx",
+            ),
         ]
         constraints = [
             models.UniqueConstraint(

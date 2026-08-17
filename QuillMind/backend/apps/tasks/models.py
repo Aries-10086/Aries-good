@@ -5,6 +5,10 @@ from django.db import models
 from django.utils import timezone
 
 
+class InvalidTaskTransition(ValueError):
+    pass
+
+
 class AsyncTask(models.Model):
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
@@ -44,7 +48,21 @@ class AsyncTask(models.Model):
     def __str__(self):
         return self.task_id
 
+    def reset_for_retry(self):
+        if self.status != self.Status.FAILED:
+            raise InvalidTaskTransition(
+                f"Cannot reset task {self.task_id} from {self.status} for retry."
+            )
+        self.status = self.Status.PENDING
+        self.error = ""
+        self.updated_at = timezone.now()
+        self.save(update_fields=("status", "error", "updated_at"))
+
     def mark_running(self):
+        if self.status != self.Status.PENDING:
+            raise InvalidTaskTransition(
+                f"Cannot mark task {self.task_id} running from {self.status}."
+            )
         self.status = self.Status.RUNNING
         self.error = ""
         self.updated_at = timezone.now()

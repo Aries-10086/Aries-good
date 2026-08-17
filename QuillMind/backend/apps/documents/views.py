@@ -1,5 +1,6 @@
 import uuid
 
+from django.db import transaction
 from drf_spectacular.utils import extend_schema
 from rest_framework import permissions, status
 from rest_framework.generics import ListAPIView, RetrieveAPIView
@@ -15,6 +16,7 @@ from .models import DocumentReview
 from .serializers import (
     DocumentReviewCreateSerializer,
     DocumentReviewDetailSerializer,
+    DocumentReviewResultSerializer,
     DocumentReviewSummarySerializer,
     DocumentReviewTaskResponseSerializer,
 )
@@ -54,23 +56,27 @@ class DocumentReviewCreateView(APIView):
         except DocumentReviewValidationError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
-        review = DocumentReview.objects.create(
-            user=request.user,
-            raw_text=raw_text,
-            doc_type=data["doc_type"],
-        )
         task_id = str(uuid.uuid4())
-        task = AsyncTask.objects.create(
-            task_id=task_id,
-            user=request.user,
-            type="document_review",
-            status=AsyncTask.Status.PENDING,
-            result={"review_id": str(review.id)},
-        )
-        review_document_task.apply_async(
-            args=[task.task_id, str(review.id), data.get("model_version") or None],
-            task_id=task.task_id,
-        )
+        with transaction.atomic():
+            review = DocumentReview.objects.create(
+                user=request.user,
+                raw_text=raw_text,
+                doc_type=data["doc_type"],
+            )
+            task = AsyncTask.objects.create(
+                task_id=task_id,
+                user=request.user,
+                type="document_review",
+                status=AsyncTask.Status.PENDING,
+                result={"review_id": str(review.id)},
+            )
+            model_version = data.get("model_version") or None
+            transaction.on_commit(
+                lambda: review_document_task.apply_async(
+                    args=[task.task_id, str(review.id), model_version],
+                    task_id=task.task_id,
+                )
+            )
         return Response(
             {
                 "task_id": task.task_id,
@@ -103,7 +109,7 @@ class DocumentReviewTaskStatusView(APIView):
                 user=request.user,
             ).first()
             if review is not None:
-                payload["review"] = DocumentReviewDetailSerializer(review).data
+                payload["review"] = DocumentReviewResultSerializer(review).data
                 payload["review_id"] = review.id
         elif review_id:
             payload["review_id"] = review_id

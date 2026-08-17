@@ -159,6 +159,19 @@ CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", REDIS_URL)
 CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", REDIS_URL)
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = int(os.getenv("CELERY_TASK_TIME_LIMIT", "300"))
+CELERY_TASK_ACKS_LATE = os.getenv("CELERY_TASK_ACKS_LATE", "true").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+DOCUMENT_REVIEW_TASK_SOFT_TIME_LIMIT = int(
+    os.getenv("DOCUMENT_REVIEW_TASK_SOFT_TIME_LIMIT", "240"),
+)
+ENABLE_TASK_PING = os.getenv("ENABLE_TASK_PING", "true").lower() in (
+    "1",
+    "true",
+    "yes",
+)
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 LLM_OPENAI_MODEL = os.getenv("LLM_OPENAI_MODEL", "gpt-4o")

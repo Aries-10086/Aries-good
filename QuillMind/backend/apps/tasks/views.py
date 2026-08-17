@@ -1,5 +1,6 @@
 import uuid
 
+from django.conf import settings
 from drf_spectacular.utils import extend_schema
 from rest_framework import permissions, status
 from rest_framework.generics import RetrieveAPIView
@@ -27,6 +28,12 @@ class PingTaskView(APIView):
 
     @extend_schema(responses={202: AsyncTaskSerializer})
     def post(self, request):
+        if not settings.ENABLE_TASK_PING:
+            return Response(
+                {"detail": "该接口仅在开发环境可用。"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
         task_id = str(uuid.uuid4())
         task = AsyncTask.objects.create(
             task_id=task_id,
